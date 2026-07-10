@@ -114,13 +114,13 @@ hot_models:
 # ---------------------------------------------------------------------------
 criteria:
   max_purchase_price: 80.0
-  min_expected_profit: 15.0
-  min_profit_percent: 30.0
-  min_opportunity_score: 75
-  min_comparable_samples: 5
-  min_quick_sale_probability: 50.0
-  max_days_to_sell: 45
-  max_alerts_per_cycle: 3
+  min_expected_profit: 12.0
+  min_profit_percent: 25.0
+  min_opportunity_score: 68
+  min_comparable_samples: 4
+  min_quick_sale_probability: 45.0
+  max_days_to_sell: 50
+  max_alerts_per_cycle: 5
 
 target_categories:
   - "veste"
@@ -145,6 +145,14 @@ target_categories:
   - "dunk"
   - "samba"
   - "fleece"
+  - "t-shirt"
+  - "tee"
+  - "short"
+  - "shorts"
+  - "bermuda"
+  - "sandale"
+  - "casquette"
+  - "lin"
 
 title_red_flags:
   - "abîmé"

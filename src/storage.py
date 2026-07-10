@@ -49,6 +49,12 @@ class SeenListingsStore:
     def mark_many(self, listing_ids: list[int]) -> None:
         self._ids.update(listing_ids)
 
+    def clear(self) -> int:
+        count = len(self._ids)
+        self._ids = set()
+        self._save()
+        return count
+
     def flush(self) -> None:
         self._save()
 

@@ -221,7 +221,7 @@ class ListingAnalyzer:
 
         category = _guess_category(title)
         season_score = season_match_score(title, category, self._season)
-        if season_score < 35:
+        if season_score < 25:
             logger.debug("Off-season item rejected: %s (season %s, score %d)", title, self._season.name, season_score)
             return None
 

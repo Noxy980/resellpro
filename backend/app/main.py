@@ -146,7 +146,11 @@ async def lifespan(app: FastAPI):
             logger.info("OpenRouter API key configured automatically")
     finally:
         db.close()
-    monitor.start()
+    if os.environ.get("MONITOR_AUTO_START", "false").lower() == "true":
+        monitor.start()
+        logger.info("Background monitor started")
+    else:
+        logger.info("Background monitor disabled — scans manuels uniquement")
     yield
     monitor.stop()
 
@@ -274,13 +278,13 @@ def opportunity_action(opp_id: int, action: OpportunityAction, db: Session = Dep
 
 
 @app.post("/api/opportunities/scan")
-def trigger_scan(db: Session = Depends(get_db)):
-    results = monitor.scan_once()
+def trigger_scan(reset_seen: bool = True, db: Session = Depends(get_db)):
+    results, stats = monitor.scan_once(reset_seen=reset_seen)
     saved = []
     for data in results:
         record = _save_opportunity(db, data)
         saved.append(_opp_to_out(record))
-    return {"found": len(saved), "opportunities": saved}
+    return {"found": len(saved), "opportunities": saved, "stats": stats}
 
 
 @app.get("/api/monitor/status")

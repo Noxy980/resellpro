@@ -128,7 +128,10 @@ export const api = {
   opportunity: (id: number) => request<Opportunity>(`/opportunities/${id}`),
   opportunityAction: (id: number, action: string) =>
     request(`/opportunities/${id}/action`, { method: 'POST', body: JSON.stringify({ action }) }),
-  scan: () => request<{ found: number; opportunities: Opportunity[] }>('/opportunities/scan', { method: 'POST' }),
+  scan: (resetSeen = true) =>
+    request<{ found: number; opportunities: Opportunity[]; stats: Record<string, number> }>(
+      `/opportunities/scan?reset_seen=${resetSeen}`, { method: 'POST' }
+    ),
   monitorStatus: () => request<{ running: boolean; status: string; last_scan: string | null }>('/monitor/status'),
 
   chat: (message: string, opportunityId?: number) =>

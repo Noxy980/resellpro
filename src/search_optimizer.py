@@ -82,7 +82,10 @@ class SearchOptimizer:
             return PreScreenResult(0, False, False, None, False, "price out of range")
 
         if self.config.target_categories:
-            if not any(cat in title.lower() for cat in self.config.target_categories):
+            title_lower = title.lower()
+            season_ok = any(kw in title_lower for kw in self._season.keywords)
+            cat_ok = any(cat in title_lower for cat in self.config.target_categories)
+            if not cat_ok and not season_ok:
                 return PreScreenResult(0, False, False, None, False, "category mismatch")
 
         if brand.lower() not in brand_lookup and self.config.target_brands:
@@ -94,7 +97,7 @@ class SearchOptimizer:
 
         category = title.lower()
         season_score = season_match_score(title, category, self._season)
-        if season_score < 30:
+        if season_score < 20:
             return PreScreenResult(0, False, False, None, False, "off-season item")
 
         score = 30.0 + (season_score - 50) * 0.4

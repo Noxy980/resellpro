@@ -18,7 +18,7 @@ Netlify héberge uniquement le site statique. L'API Python doit tourner sur un s
 3. Render détecte `render.yaml` et crée le service `resellpro-api`
 4. Dans les variables d'environnement Render, ajoutez :
    - `OPENROUTER_API_KEY` = votre clé OpenRouter
-   - `ALLOWED_ORIGINS` = `https://votre-site.netlify.app` (à mettre à jour après l'étape 2)
+   - `ALLOWED_ORIGINS` = `https://resellpro-vinted.netlify.app,*`
 5. Attendez le déploiement → notez l'URL, ex. `https://resellpro-api.onrender.com`
 
 Test : ouvrez `https://resellpro-api.onrender.com/api/monitor/status` — vous devez voir du JSON.
@@ -64,7 +64,7 @@ Glissez le dossier `desktop/dist` sur [app.netlify.com/drop](https://app.netlify
 Retournez sur Render et mettez à jour :
 
 ```
-ALLOWED_ORIGINS=https://votre-nom.netlify.app
+ALLOWED_ORIGINS=https://resellpro-vinted.netlify.app,*
 ```
 
 Redéployez le service Render.

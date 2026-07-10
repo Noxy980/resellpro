@@ -21,6 +21,7 @@ export default function Opportunities() {
   const [tab, setTab] = useState('active')
   const [selected, setSelected] = useState<Opportunity | null>(null)
   const [scanning, setScanning] = useState(false)
+  const [scanMsg, setScanMsg] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({ min_score: 0, brand: '', max_price: 0, min_profit: 0, category: '' })
 
@@ -28,7 +29,22 @@ export default function Opportunities() {
 
   const scan = async () => {
     setScanning(true)
-    try { await api.scan(); refresh() } finally { setScanning(false) }
+    setScanMsg('Recherche sur Vinted... (30-90 secondes)')
+    try {
+      const res = await api.scan(true)
+      const s = res.stats || {}
+      setScanMsg(
+        res.found > 0
+          ? `${res.found} opportunité(s) trouvée(s) !`
+          : `Scan terminé — ${s.analyzed || 0} analysés, ${s.passed || 0} validés. Réessayez dans quelques minutes.`
+      )
+      refresh()
+    } catch {
+      setScanMsg('Erreur de scan — vérifiez que l\'API est en ligne.')
+    } finally {
+      setScanning(false)
+      setTimeout(() => setScanMsg(''), 8000)
+    }
   }
 
   const tabs = [
@@ -47,9 +63,14 @@ export default function Opportunities() {
         </div>
         <button onClick={scan} disabled={scanning} className="btn-primary w-full sm:w-auto">
           <RefreshCw className={`w-4 h-4 ${scanning ? 'animate-spin' : ''}`} />
-          {scanning ? 'Analyse...' : 'Scanner Vinted'}
+          {scanning ? 'Scan en cours...' : 'Scanner Vinted'}
         </button>
       </div>
+      {scanMsg && (
+        <div className="mb-4 px-4 py-3 rounded-2xl bg-violet-50 border border-violet-100 text-sm text-violet-800 font-medium">
+          {scanMsg}
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 mb-6">
         <div className="relative flex-1 min-w-0">

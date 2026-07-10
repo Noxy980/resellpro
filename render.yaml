@@ -13,7 +13,9 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"
+      - key: MONITOR_AUTO_START
+        value: "false"
       - key: OPENROUTER_API_KEY
         sync: false
       - key: ALLOWED_ORIGINS
-        value: "*"
+        value: "https://resellpro-vinted.netlify.app,*"
