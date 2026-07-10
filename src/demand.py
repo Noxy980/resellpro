@@ -47,15 +47,25 @@ class DemandAnalyzer:
 
         for model in self.config.hot_models:
             score = 0
-            if model.brand.lower() not in brand.lower() and brand.lower() not in model.brand.lower():
-                continue
+            text_match = False
             if model.canonical.lower() in text:
+                text_match = True
                 score = 100
             else:
                 for alias in model.aliases:
                     if alias.lower() in text:
+                        text_match = True
                         score = max(score, 80)
-            if score > best_score:
+            if not text_match:
+                continue
+            brand_ok = (
+                model.brand.lower() in brand.lower()
+                or brand.lower() in model.brand.lower()
+                or not brand
+            )
+            if model.canonical.lower() in ("maillot",) or "maillot" in model.canonical.lower():
+                brand_ok = True
+            if brand_ok and score > best_score:
                 best_score = score
                 best = model
 

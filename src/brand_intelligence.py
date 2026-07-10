@@ -48,6 +48,7 @@ _BRAND_DB: dict[str, BrandIntel] = {
     "CP Company": BrandIntel("CP Company", 82, 78, "strong", "high", "Goggle jacket niche"),
     "Barbour": BrandIntel("Barbour", 72, 68, "moderate", "medium", "Automne/hiver UK"),
     "Salomon": BrandIntel("Salomon", 86, 84, "hot", "high", "XT-6 & sneakers trail hype"),
+    "Umbro": BrandIntel("Umbro", 78, 82, "strong", "medium", "Maillots vintage & retro football"),
     "Asics": BrandIntel("Asics", 80, 78, "strong", "medium", "Gel-Kayano, 2000s running"),
 }
 

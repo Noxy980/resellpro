@@ -125,6 +125,7 @@ export interface ScanEvent {
   analyzed?: number
   passed?: number
   errors?: number
+  pepites_found?: number
 }
 
 export interface ChatMessage {

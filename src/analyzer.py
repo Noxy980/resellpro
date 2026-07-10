@@ -16,6 +16,7 @@ from .image_analyzer import ImageAnalyzer
 from .knowledge_base import KnowledgeBaseStore
 from .sales_potential import SalesPotentialAnalyzer
 from .scorer import ExpertScore, ExpertScorer
+from .gem_hunter import is_pepite_listing, is_year_round_item, pepite_category, pepite_demand_boost
 from .seasonal import get_current_season, season_match_score
 from .search_optimizer import SearchOptimizer
 from .vinted_client import VintedClient
@@ -84,6 +85,7 @@ def _guess_category(title: str) -> str:
         "sneaker": ["sneaker", "basket", "shoe", "chaussure", "trainer"],
         "polo": ["polo"],
         "chemise": ["chemise", "shirt", "tee", "t-shirt", "t shirt"],
+        "maillot": ["maillot", "jersey", "football shirt", "football", "nba"],
     }
     text = title.lower()
     for cat, kws in mapping.items():
@@ -155,12 +157,14 @@ class ListingAnalyzer:
         )
         return result.is_candidate
 
-    def analyze(self, item: dict[str, Any], *, relaxed: bool = False) -> ListingAnalysis | None:
+    def analyze(self, item: dict[str, Any], *, relaxed: bool = False, gem_hunt: bool = True) -> ListingAnalysis | None:
         listing_id = int(item["id"])
         price, currency = _parse_price(item)
         brand = item.get("brand_title") or ""
         title = self.search_optimizer.normalize_title(item.get("title") or "")
         brand_cfg = self._get_brand_config(brand)
+        fav_count = int(item.get("favourite_count") or 0)
+        is_pepite = is_pepite_listing(title, brand, fav_count)
 
         prescreen = self.search_optimizer.pre_screen(
             item,
@@ -183,7 +187,15 @@ class ListingAnalyzer:
         if market.count < self.config.criteria.min_comparable_samples:
             if hot and hot.avg_resale_price > 0:
                 market.median_price = hot.avg_resale_price
-                market.count = self.config.criteria.min_comparable_samples
+                market.count = max(market.count, self.config.criteria.min_comparable_samples)
+            elif is_pepite:
+                kb_resale = self.knowledge.expected_resale(brand, model)
+                est = kb_resale or (price * 1.55 if price > 0 else 0)
+                if est > price:
+                    market.median_price = est
+                    market.count = max(market.count, self.config.criteria.min_comparable_samples)
+                else:
+                    return None
             else:
                 kb_resale = self.knowledge.expected_resale(brand, model)
                 if kb_resale:
@@ -205,9 +217,11 @@ class ListingAnalyzer:
         profit_pct = (profit / price * 100) if price > 0 else 0
 
         if profit < self.config.criteria.min_expected_profit:
-            return None
+            if not (is_pepite and profit >= 5):
+                return None
         if profit_pct < self.config.criteria.min_profit_percent:
-            return None
+            if not (is_pepite and profit_pct >= 12):
+                return None
 
         is_underpriced = price < market.median_price * 0.65 or prescreen.is_underpriced_hint
 
@@ -219,9 +233,11 @@ class ListingAnalyzer:
             dominant = dominant or p.get("dominant_color")
             max_res = max(max_res, max(int(p.get("width") or 0), int(p.get("height") or 0)))
 
-        category = _guess_category(title)
+        category = _guess_category(title) or pepite_category(title) or "autre"
         season_score = season_match_score(title, category, self._season)
-        if season_score < 25:
+        if is_pepite:
+            season_score = max(season_score, 65)
+        if season_score < 25 and not is_year_round_item(title) and not is_pepite:
             logger.debug("Off-season item rejected: %s (season %s, score %d)", title, self._season.name, season_score)
             return None
 
@@ -272,16 +288,21 @@ class ListingAnalyzer:
             is_typo=prescreen.is_typo_listing,
             season_score=season_score,
             season_name=self._season.name,
+            is_pepite=is_pepite,
+            pepite_boost=pepite_demand_boost(title, fav_count),
         )
 
+        use_relaxed = relaxed or gem_hunt
         if not expert.reseller_approved:
-            if not relaxed or expert.total < 65 or profit < 12:
+            min_score = 52 if is_pepite else 58
+            min_profit = 5 if is_pepite else 7
+            if not use_relaxed or expert.total < min_score or profit < min_profit:
                 logger.debug(
-                    "Rejected by reseller gate: %s (score %d, days %d, demand %s)",
-                    title, expert.total, sales.estimated_days_to_sell, demand.level,
+                    "Rejected by reseller gate: %s (score %d, days %d, demand %s, pepite=%s)",
+                    title, expert.total, sales.estimated_days_to_sell, demand.level, is_pepite,
                 )
                 return None
-            logger.info("Relaxed pass: %s (score %d)", title, expert.total)
+            logger.info("Gem pass: %s (score %d, pepite=%s)", title, expert.total, is_pepite)
 
         self.knowledge_store.kb.learn(
             brand, model, price, estimated_resale, profit, sales.estimated_days_to_sell,

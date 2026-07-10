@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .config import AppConfig, HotModelConfig
+from .gem_hunter import is_pepite_listing, is_year_round_item, pepite_demand_boost
 from .seasonal import get_current_season, season_match_score
 
 
@@ -83,15 +84,18 @@ class SearchOptimizer:
 
         if self.config.target_categories:
             title_lower = title.lower()
+            fav = int(item.get("favourite_count") or 0)
+            is_pepite = is_pepite_listing(title, brand, fav)
             season_ok = any(kw in title_lower for kw in self._season.keywords)
             cat_ok = any(cat in title_lower for cat in self.config.target_categories)
-            if not cat_ok and not season_ok:
+            if not cat_ok and not season_ok and not is_pepite:
                 return PreScreenResult(0, False, False, None, False, "category mismatch")
 
         if brand.lower() not in brand_lookup and self.config.target_brands:
             title_lower = title.lower()
+            fav = int(item.get("favourite_count") or 0)
             brand_in_title = any(b.name.lower() in title_lower for b in self.config.target_brands)
-            if not brand_in_title:
+            if not brand_in_title and not is_pepite_listing(title, brand, fav):
                 return PreScreenResult(0, False, False, None, False, "brand not targeted")
 
         text = title.lower()
@@ -100,10 +104,12 @@ class SearchOptimizer:
 
         category = title.lower()
         season_score = season_match_score(title, category, self._season)
-        if season_score < 20:
+        fav_early = int(item.get("favourite_count") or 0)
+        if season_score < 20 and not is_year_round_item(title) and not is_pepite_listing(title, brand, fav_early):
             return PreScreenResult(0, False, False, None, False, "off-season item")
 
         score = 30.0 + (season_score - 50) * 0.4
+        score += pepite_demand_boost(title, fav_early)
         for boost_brand in self._season.brands_boost:
             if boost_brand.lower() in brand.lower():
                 score += 12
@@ -123,7 +129,7 @@ class SearchOptimizer:
                     matched = model.canonical
 
         fav = int(item.get("favourite_count") or 0)
-        score += min(15, fav * 3)
+        score += min(25, fav * 4)
 
         is_underpriced = False
         if kb_suggested_price and price < kb_suggested_price * 0.7:
@@ -143,13 +149,17 @@ class SearchOptimizer:
         )
 
     def prioritize(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Sort listings: newest with highest early interest first."""
+        """Sort: pépites avec favoris d'abord, puis prix bas, puis récent."""
 
         def sort_key(item: dict[str, Any]) -> tuple:
+            title = item.get("title") or ""
+            brand = item.get("brand_title") or ""
             fav = int(item.get("favourite_count") or 0)
             price_data = item.get("price") or {}
             price = float(price_data.get("amount", 999))
             item_id = int(item.get("id") or 0)
-            return (-fav, price, -item_id)
+            pepite = is_pepite_listing(title, brand, fav)
+            pepite_rank = 0 if pepite else 1
+            return (pepite_rank, -fav, price, -item_id)
 
         return sorted(items, key=sort_key)

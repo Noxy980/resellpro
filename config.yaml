@@ -5,10 +5,10 @@
 vinted:
   country: "fr"
   poll_interval_seconds: 90
-  listings_per_search: 48
-  request_delay_seconds: 1.5
-  max_analyses_per_brand: 12
-  min_prescreen_score: 25
+  listings_per_search: 96
+  request_delay_seconds: 1.2
+  max_analyses_per_brand: 20
+  min_prescreen_score: 18
   enable_typo_searches: true
 
 discord:
@@ -48,6 +48,18 @@ target_brands:
   - name: "Supreme"
     popularity: 95
     resale_ease: 90
+  - name: "New Balance"
+    popularity: 86
+    resale_ease: 84
+  - name: "Puma"
+    popularity: 76
+    resale_ease: 74
+  - name: "Umbro"
+    popularity: 72
+    resale_ease: 78
+  - name: "Salomon"
+    popularity: 86
+    resale_ease: 84
 
 # ---------------------------------------------------------------------------
 # Hot models — high-demand items that sell fast
@@ -108,19 +120,43 @@ hot_models:
     demand_boost: 35
     avg_resale_price: 120
     resale_speed_days: 14
+  - brand: "Nike"
+    canonical: "Maillot"
+    aliases: ["maillot", "jersey", "football shirt", "football"]
+    demand_boost: 32
+    avg_resale_price: 55
+    resale_speed_days: 8
+  - brand: "Adidas"
+    canonical: "Maillot"
+    aliases: ["maillot", "jersey", "football"]
+    demand_boost: 30
+    avg_resale_price: 50
+    resale_speed_days: 8
+  - brand: "Nike"
+    canonical: "Air Jordan"
+    aliases: ["jordan", "air jordan", "aj1", "aj4", "dunk"]
+    demand_boost: 30
+    avg_resale_price: 90
+    resale_speed_days: 12
+  - brand: "Adidas"
+    canonical: "Gazelle"
+    aliases: ["gazelle", "gazell", "handball spezial", "spezial"]
+    demand_boost: 28
+    avg_resale_price: 70
+    resale_speed_days: 10
 
 # ---------------------------------------------------------------------------
 # Stricter expert criteria — quality over quantity
 # ---------------------------------------------------------------------------
 criteria:
-  max_purchase_price: 80.0
-  min_expected_profit: 12.0
-  min_profit_percent: 25.0
-  min_opportunity_score: 72
-  min_comparable_samples: 4
-  min_quick_sale_probability: 45.0
+  max_purchase_price: 150.0
+  min_expected_profit: 7.0
+  min_profit_percent: 15.0
+  min_opportunity_score: 58
+  min_comparable_samples: 2
+  min_quick_sale_probability: 28.0
   max_days_to_sell: 50
-  max_alerts_per_cycle: 5
+  max_alerts_per_cycle: 40
 
 target_categories:
   - "veste"
@@ -153,6 +189,17 @@ target_categories:
   - "sandale"
   - "casquette"
   - "lin"
+  - "maillot"
+  - "jersey"
+  - "football"
+  - "nba"
+  - "vintage"
+  - "retro"
+  - "jordan"
+  - "dunk"
+  - "samba"
+  - "gazelle"
+  - "collector"
 
 title_red_flags:
   - "abîmé"
@@ -194,6 +241,13 @@ demand:
     carhartt: 82
     arc'teryx: 88
     supreme: 93
+    maillot: 96
+    jersey: 95
+    football: 92
+    nba: 90
+    vintage: 85
+    retro: 82
+    jordan: 94
     polo: 65
     chemise: 55
     pantalon: 60
@@ -209,6 +263,10 @@ demand:
     - "vintage 90s"
     - "archive"
     - "deadstock"
+    - "maillot psg"
+    - "maillot france"
+    - "maillot vintage"
+    - "football shirt"
 
 # ---------------------------------------------------------------------------
 # Aesthetic & style analysis

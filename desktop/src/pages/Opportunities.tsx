@@ -189,6 +189,9 @@ export default function Opportunities() {
           </div>
           <p className="text-xs text-violet-200 mt-1 truncate">
             {scanProgress.query} · {scanProgress.items_fetched || 0} annonces · {scanProgress.analyzed || 0} analysées
+            {(scanProgress as { pepites_found?: number }).pepites_found
+              ? ` · ${(scanProgress as { pepites_found?: number }).pepites_found} pépites`
+              : ''}
           </p>
         </div>
       )}

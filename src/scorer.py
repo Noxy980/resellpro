@@ -117,10 +117,11 @@ class ExpertScorer:
         is_typo: bool,
         aesthetic: AestheticAssessment,
         season_name: str = "",
+        is_pepite: bool = False,
     ) -> str:
         reasons: list[str] = []
-        if season_name:
-            reasons.append(f"Adapté à la saison ({season_name})")
+        if is_pepite:
+            reasons.insert(0, "🔥 Pépite détectée — forte demande Vinted")
         if is_underpriced:
             reasons.append("Priced well below market median")
         if is_typo:
@@ -135,6 +136,8 @@ class ExpertScorer:
             reasons.append(f"On-trend style: {aesthetic.trend_match}")
         if demand.level == "high":
             reasons.append("High current demand")
+        if season_name and not is_pepite:
+            reasons.append(f"Adapté à la saison ({season_name})")
 
         if not reasons:
             reasons.append(f"Solid {brand} flip with €{profit:.0f} estimated profit")
@@ -181,19 +184,21 @@ class ExpertScorer:
         demand: DemandAssessment,
         has_red_flags: bool,
         season_score: float = 50.0,
+        is_pepite: bool = False,
     ) -> bool:
         c = self.config.criteria
-        if total < c.min_opportunity_score:
+        min_score = c.min_opportunity_score - (12 if is_pepite else 0)
+        if total < min_score:
             return False
-        if season_score < 35:
+        if season_score < 35 and not is_pepite:
             return False
-        if profit < c.min_expected_profit:
+        if profit < c.min_expected_profit - (3 if is_pepite else 0):
             return False
-        if sales.quick_sale_probability < c.min_quick_sale_probability:
+        if sales.quick_sale_probability < c.min_quick_sale_probability - (10 if is_pepite else 0):
             return False
         if sales.estimated_days_to_sell > c.max_days_to_sell:
             return False
-        if demand.level == "low":
+        if demand.level == "low" and not is_pepite:
             return False
         if aesthetic.is_hard_to_sell and aesthetic.score < 50:
             return False
@@ -227,6 +232,8 @@ class ExpertScorer:
         is_typo: bool,
         season_score: float = 50.0,
         season_name: str = "",
+        is_pepite: bool = False,
+        pepite_boost: float = 0.0,
     ) -> ExpertScore:
         brand_pts = self._brand_points(brand_cfg, brand)
         demand_pts = self._demand_points(demand)
@@ -239,11 +246,13 @@ class ExpertScorer:
         total = int(round(
             brand_pts + demand_pts + profit_pts + speed_pts + style_pts + listing_pts + season_pts
         ))
+        if is_pepite:
+            total = min(100, total + int(pepite_boost * 0.4))
 
         why = self._build_why_buy(
             brand=brand, model=model, profit=profit, profit_percent=profit_percent,
             demand=demand, sales=sales, is_underpriced=is_underpriced,
-            is_typo=is_typo, aesthetic=aesthetic, season_name=season_name,
+            is_typo=is_typo, aesthetic=aesthetic, season_name=season_name, is_pepite=is_pepite,
         )
         risk = self._build_risk(
             image=image, aesthetic=aesthetic, sales=sales,
@@ -254,6 +263,7 @@ class ExpertScorer:
             total=total, profit=profit, sales=sales, aesthetic=aesthetic,
             image=image, demand=demand, has_red_flags=has_red_flags,
             season_score=season_score,
+            is_pepite=is_pepite,
         )
 
         return ExpertScore(
