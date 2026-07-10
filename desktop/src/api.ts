@@ -105,6 +105,28 @@ export interface VintedProfile {
   is_connected: boolean; error?: string
 }
 
+export interface VintedSale {
+  id: number; title: string; brand: string; price: number
+  status: string; sold_at: string; url: string; image_url?: string; buyer?: string
+}
+
+export interface ScanEvent {
+  event: 'start' | 'progress' | 'found' | 'done' | 'error'
+  opportunity?: Opportunity
+  duration_minutes?: number
+  elapsed_seconds?: number
+  remaining_seconds?: number
+  found_count?: number
+  message?: string
+  stats?: Record<string, unknown>
+  query?: string
+  queries_total?: number
+  items_fetched?: number
+  analyzed?: number
+  passed?: number
+  errors?: number
+}
+
 export interface ChatMessage {
   id: number; role: string; content: string; created_at: string
 }
@@ -116,12 +138,17 @@ export interface DraftListing {
 
 export const api = {
   health: () => request<{ ok: boolean }>('/health'),
-  connectVinted: (country = 'fr') =>
-    request<{ connected: boolean }>('/vinted/connect', { method: 'POST', body: JSON.stringify({ country }) }),
+  connectVinted: (country = 'fr', cookies?: string) =>
+    request<{ connected: boolean; username?: string; has_cookies?: boolean }>(
+      '/vinted/connect',
+      { method: 'POST', body: JSON.stringify({ country, cookies: cookies || undefined }) },
+    ),
+  disconnectVinted: () => request('/vinted/disconnect', { method: 'POST' }),
 
-  vintedStatus: () => request<{ connected: boolean; country: string; username: string }>('/vinted/status'),
+  vintedStatus: () => request<{ connected: boolean; country: string; username: string; has_cookies?: boolean }>('/vinted/status'),
   vintedProfile: () => request<VintedProfile>('/vinted/profile'),
   vintedListings: () => request<{ listings: Record<string, unknown>[] }>('/vinted/listings'),
+  vintedSales: () => request<{ sales: VintedSale[]; message?: string }>('/vinted/sales'),
 
   opportunities: (params: Record<string, string | number> = {}) => {
     const q = new URLSearchParams()
@@ -136,6 +163,22 @@ export const api = {
     requestOnce<{ found: number; opportunities: Opportunity[]; stats: Record<string, unknown> }>(
       `/opportunities/scan?reset_seen=${resetSeen}`, { method: 'POST' }, 300000
     ),
+
+  /** SSE scan — returns a stop function. */
+  scanStream: (durationMinutes: number, resetSeen: boolean, onEvent: (evt: ScanEvent) => void) => {
+    const url = `${API}/opportunities/scan/stream?duration_minutes=${durationMinutes}&reset_seen=${resetSeen}`
+    const es = new EventSource(url)
+    es.onmessage = (msg) => {
+      try {
+        onEvent(JSON.parse(msg.data) as ScanEvent)
+      } catch { /* ignore malformed */ }
+    }
+    es.onerror = () => {
+      onEvent({ event: 'error', message: 'Connexion scan interrompue — le serveur a peut-être expiré.' })
+      es.close()
+    }
+    return () => es.close()
+  },
   vintedDiagnostic: () => request<{ ok: boolean; error?: string; items_count?: number }>('/vinted/diagnostic'),
   monitorStatus: () => request<{ running: boolean; status: string; last_scan: string | null }>('/monitor/status'),
 

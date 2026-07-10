@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   X, ExternalLink, Heart, ShoppingCart, Sparkles,
   CheckCircle, AlertTriangle, MessageSquare,
@@ -15,6 +16,17 @@ export default function OpportunityDetail({ opportunity: opp, onClose, onAction 
   const [aiRec, setAiRec] = useState('')
   const [loadingAi, setLoadingAi] = useState(false)
 
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
+
   const action = async (type: string) => {
     await api.opportunityAction(opp.id, type)
     onAction()
@@ -28,17 +40,25 @@ export default function OpportunityDetail({ opportunity: opp, onClose, onAction 
     } finally { setLoadingAi(false) }
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="p-6">
           <div className="flex items-start justify-between mb-5">
             <h2 className="font-semibold text-lg text-gray-900 pr-4">{opp.title}</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 shrink-0">
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <div className="flex gap-6">
-            <div className="w-44 h-52 rounded-xl overflow-hidden bg-gray-100 shrink-0">
+          <div className="flex flex-col sm:flex-row gap-6">
+            <div className="w-full sm:w-44 h-52 rounded-xl overflow-hidden bg-gray-100 shrink-0">
               {opp.image_url && <img src={opp.image_url} alt="" className="w-full h-full object-cover" />}
             </div>
             <div className="flex-1 space-y-3">
@@ -95,6 +115,7 @@ export default function OpportunityDetail({ opportunity: opp, onClose, onAction 
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

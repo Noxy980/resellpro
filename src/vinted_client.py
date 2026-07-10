@@ -20,9 +20,24 @@ class VintedClient:
         self.config = config
         self.last_error: str | None = None
         self._impersonate_idx = 0
+        self._proxy_url: str | None = None
         self.session = self._new_session()
         self._session_initialized = False
         self._last_request_at = 0.0
+
+    def set_proxy(self, proxy_url: str | None) -> None:
+        self._proxy_url = proxy_url.strip() if proxy_url else None
+        if self._proxy_url:
+            self.session.proxies = {"http": self._proxy_url, "https": self._proxy_url}
+        else:
+            self.session.proxies = {}
+
+    def apply_cookies(self, cookies: dict[str, str], country: str | None = None) -> None:
+        domain = f".vinted.{country or self.config.country}"
+        for name, value in cookies.items():
+            if name and value:
+                self.session.cookies.set(name, value, domain=domain)
+        self._session_initialized = True
 
     def _new_session(self):
         profile = IMPERSONATE_PROFILES[self._impersonate_idx % len(IMPERSONATE_PROFILES)]

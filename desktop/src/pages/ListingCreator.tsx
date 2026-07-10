@@ -86,9 +86,25 @@ export default function ListingCreator() {
             )
           })}
           {typeof result.publish_url === 'string' && (
-            <button onClick={() => window.open(result.publish_url as string, '_blank')} className="btn-primary">
-              <ExternalLink className="w-4 h-4" />Publier sur Vinted
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  const text = [
+                    result.title, result.description, `Prix: €${result.recommended_price || form.target_price}`,
+                  ].filter(Boolean).join('\n\n')
+                  navigator.clipboard.writeText(text)
+                  setCopied('publish')
+                  setTimeout(() => setCopied(''), 2000)
+                }}
+                className="btn-secondary"
+              >
+                {copied === 'publish' ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {copied === 'publish' ? 'Copié !' : 'Copier pour Vinted'}
+              </button>
+              <button onClick={() => window.open(result.publish_url as string, '_blank')} className="btn-primary">
+                <ExternalLink className="w-4 h-4" />Ouvrir Vinted pour publier
+              </button>
+            </div>
           )}
         </div>
       )}

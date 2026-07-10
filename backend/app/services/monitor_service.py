@@ -6,6 +6,7 @@ import logging
 import sys
 import threading
 import time
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -67,11 +68,8 @@ class MonitorService:
         self._running = False
         self._status = "stopped"
 
-    def scan_once(self, *, reset_seen: bool = False) -> tuple[list[dict], dict]:
-        self._status = "scanning"
-        results: list[dict] = []
-        candidates: list[ListingAnalysis] = []
-        stats: dict = {
+    def _empty_stats(self) -> dict:
+        return {
             "queries_run": 0,
             "items_fetched": 0,
             "analyzed": 0,
@@ -80,58 +78,67 @@ class MonitorService:
             "error_samples": [],
         }
 
-        if reset_seen:
-            stats["seen_cleared"] = self.store.clear()
-
+    def _build_queries(self) -> list[str]:
         queries = [b.name for b in self.config.target_brands]
         if self.config.enable_typo_searches:
             queries.extend(self.optimizer.typo_search_queries()[:6])
         queries.extend(self.optimizer.seasonal_search_queries()[:8])
-        queries = list(dict.fromkeys(queries))[:16]
+        return list(dict.fromkeys(queries))[:16]
 
-        for query in queries:
-            stats["queries_run"] += 1
+    def _run_query(self, query: str, stats: dict) -> list[ListingAnalysis]:
+        """Run one catalog search and return analyses that pass the scorer."""
+        found: list[ListingAnalysis] = []
+        stats["queries_run"] += 1
+        try:
+            items = self.client.search_catalog(query, order="newest_first", per_page=32)
+        except Exception as exc:
+            err = f"{query}: {exc}"
+            logger.error("Search failed: %s", err)
+            stats["errors"] += 1
+            if len(stats["error_samples"]) < 3:
+                stats["error_samples"].append(err[:200])
+            self.client.reset_session(rotate=True)
+            return found
+
+        stats["items_fetched"] += len(items)
+        if not items:
+            return found
+
+        items = self.optimizer.prioritize(items)
+        analyzed_this_query = 0
+
+        for item in items:
+            if analyzed_this_query >= 8:
+                break
+            if not self.analyzer.quick_screen(item):
+                continue
+
+            analyzed_this_query += 1
             try:
-                items = self.client.search_catalog(query, order="newest_first", per_page=32)
+                analysis = self.analyzer.analyze(item, relaxed=True)
             except Exception as exc:
-                err = f"{query}: {exc}"
-                logger.error("Search failed: %s", err)
+                logger.error("Analysis error: %s", exc)
                 stats["errors"] += 1
-                if len(stats["error_samples"]) < 3:
-                    stats["error_samples"].append(err[:200])
-                self.client.reset_session(rotate=True)
                 continue
 
-            stats["items_fetched"] += len(items)
-            if not items:
-                continue
+            stats["analyzed"] += 1
+            if analysis:
+                stats["passed"] += 1
+                found.append(analysis)
 
-            items = self.optimizer.prioritize(items)
-            analyzed_this_query = 0
+        return found
 
-            for item in items:
-                if analyzed_this_query >= 8:
-                    break
+    def scan_once(self, *, reset_seen: bool = False) -> tuple[list[dict], dict]:
+        self._status = "scanning"
+        results: list[dict] = []
+        candidates: list[ListingAnalysis] = []
+        stats = self._empty_stats()
 
-                if not self.analyzer.quick_screen(item):
-                    continue
+        if reset_seen:
+            stats["seen_cleared"] = self.store.clear()
 
-                analyzed_this_query += 1
-                lid = int(item.get("id") or 0)
-
-                try:
-                    analysis = self.analyzer.analyze(item, relaxed=True)
-                except Exception as exc:
-                    logger.error("Analysis error: %s", exc)
-                    stats["errors"] += 1
-                    continue
-
-                stats["analyzed"] += 1
-                if analysis:
-                    stats["passed"] += 1
-                    candidates.append(analysis)
-                elif lid:
-                    pass  # ne plus marquer comme vu — l'utilisateur veut revoir les annonces
+        for query in self._build_queries():
+            candidates.extend(self._run_query(query, stats))
 
         candidates.sort(key=lambda a: (-a.opportunity_score, -a.potential_profit))
         top = candidates[: max(self.config.criteria.max_alerts_per_cycle * 2, 10)]
@@ -148,9 +155,76 @@ class MonitorService:
         self._last_stats = stats
         self._status = "idle"
         self._error = stats["error_samples"][0] if stats["error_samples"] and not results else None
-        logger.info("Scan: %d results, %d fetched, %d analyzed, %d errors",
-                    len(results), stats["items_fetched"], stats["analyzed"], stats["errors"])
+        logger.info(
+            "Scan: %d results, %d fetched, %d analyzed, %d errors",
+            len(results), stats["items_fetched"], stats["analyzed"], stats["errors"],
+        )
         return results, stats
+
+    def scan_stream(
+        self,
+        duration_minutes: int = 15,
+        *,
+        reset_seen: bool = False,
+    ) -> Iterator[dict]:
+        """Yield SSE event dicts while scanning for the given duration."""
+        self._status = "scanning"
+        stats = self._empty_stats()
+        start = time.monotonic()
+        deadline = start + max(1, duration_minutes) * 60
+        yielded_ids: set[int] = set()
+        queries = self._build_queries()
+        query_idx = 0
+
+        if reset_seen:
+            stats["seen_cleared"] = self.store.clear()
+
+        yield {
+            "event": "start",
+            "duration_minutes": duration_minutes,
+            "queries_total": len(queries),
+        }
+
+        try:
+            while time.monotonic() < deadline:
+                query = queries[query_idx % len(queries)]
+                query_idx += 1
+
+                yield {
+                    "event": "progress",
+                    "query": query,
+                    "elapsed_seconds": int(time.monotonic() - start),
+                    "remaining_seconds": int(max(0, deadline - time.monotonic())),
+                    "queries_run": stats["queries_run"],
+                    "items_fetched": stats["items_fetched"],
+                    "analyzed": stats["analyzed"],
+                    "passed": stats["passed"],
+                    "errors": stats["errors"],
+                }
+
+                for analysis in self._run_query(query, stats):
+                    d = self._to_dict(analysis)
+                    vid = int(d.get("vinted_id") or 0)
+                    if vid and vid not in yielded_ids:
+                        yielded_ids.add(vid)
+                        yield {"event": "found", "opportunity": d}
+
+                time.sleep(0.25)
+        finally:
+            self.knowledge_store.flush()
+            self._last_scan = datetime.now(timezone.utc)
+            self._last_stats = {**stats, "found_count": len(yielded_ids)}
+            self._status = "idle"
+            self._error = (
+                stats["error_samples"][0]
+                if stats["error_samples"] and not yielded_ids
+                else None
+            )
+            yield {
+                "event": "done",
+                "stats": self._last_stats,
+                "found_count": len(yielded_ids),
+            }
 
     def _loop(self) -> None:
         while self._running:

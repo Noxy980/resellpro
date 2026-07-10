@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Save, Key, Sparkles, Brain } from 'lucide-react'
+import { Save, Key, Sparkles, Brain, Globe, Clock } from 'lucide-react'
 import { api } from '../api'
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState({ monitor_enabled: true, poll_interval: 90, has_openai_key: false, ai_provider: '' })
+  const [settings, setSettings] = useState({
+    monitor_enabled: true,
+    poll_interval: 90,
+    default_scan_minutes: 15,
+    has_vinted_proxy: false,
+    has_openai_key: false,
+    ai_provider: '',
+  })
   const [apiKey, setApiKey] = useState('')
+  const [vintedProxy, setVintedProxy] = useState('')
   const [profile, setProfile] = useState<Record<string, unknown>>({})
   const [saved, setSaved] = useState(false)
 
@@ -12,6 +20,8 @@ export default function SettingsPage() {
     api.settings().then(s => setSettings({
       monitor_enabled: Boolean(s.monitor_enabled ?? true),
       poll_interval: Number(s.poll_interval ?? 90),
+      default_scan_minutes: Number(s.default_scan_minutes ?? 15),
+      has_vinted_proxy: Boolean(s.has_vinted_proxy),
       has_openai_key: Boolean(s.has_openai_key),
       ai_provider: String(s.ai_provider ?? ''),
     }))
@@ -23,6 +33,8 @@ export default function SettingsPage() {
       openai_api_key: apiKey || undefined,
       monitor_enabled: settings.monitor_enabled,
       poll_interval: settings.poll_interval,
+      default_scan_minutes: settings.default_scan_minutes,
+      vinted_proxy: vintedProxy || undefined,
     })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -50,6 +62,40 @@ export default function SettingsPage() {
           <label className="text-xs font-medium text-gray-500">Clé API OpenRouter</label>
           <input type="password" className="input mt-1" placeholder="sk-or-v1-..."
             value={apiKey} onChange={e => setApiKey(e.target.value)} />
+        </div>
+
+        <div className="glass-card">
+          <h3 className="font-medium mb-3 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-violet-500" />Durée de scan par défaut
+          </h3>
+          <p className="text-sm text-gray-500 mb-3">Durée du scan manuel sur la page Opportunités</p>
+          <select
+            className="input"
+            value={settings.default_scan_minutes}
+            onChange={e => setSettings(s => ({ ...s, default_scan_minutes: parseInt(e.target.value) }))}
+          >
+            <option value={5}>5 minutes</option>
+            <option value={15}>15 minutes</option>
+            <option value={30}>30 minutes</option>
+            <option value={60}>1 heure</option>
+          </select>
+        </div>
+
+        <div className="glass-card">
+          <h3 className="font-medium mb-3 flex items-center gap-2">
+            <Globe className="w-4 h-4 text-violet-500" />Proxy Vinted (optionnel)
+          </h3>
+          <p className="text-sm text-gray-500 mb-3">
+            Utile si Render est bloqué par Vinted. Format : <code className="text-xs bg-slate-100 px-1 rounded">http://user:pass@host:port</code>
+            {settings.has_vinted_proxy && <span className="text-emerald-600 ml-2">✓ Configuré</span>}
+          </p>
+          <input
+            type="password"
+            className="input"
+            placeholder="http://proxy:port"
+            value={vintedProxy}
+            onChange={e => setVintedProxy(e.target.value)}
+          />
         </div>
 
         <div className="glass-card">

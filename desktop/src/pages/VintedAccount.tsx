@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom'
 import {
   User, Package, Star, ExternalLink, RefreshCw, Heart, Clock, TrendingUp, LogIn,
 } from 'lucide-react'
-import { api, VintedProfile, InventoryItem, Opportunity } from '../api'
+import { api, VintedProfile, InventoryItem, Opportunity, VintedSale } from '../api'
 
 type Tab = 'annonces' | 'ventes' | 'favoris' | 'attente' | 'stats'
 
 export default function VintedAccount() {
   const [profile, setProfile] = useState<VintedProfile | null>(null)
   const [listings, setListings] = useState<Record<string, unknown>[]>([])
+  const [vintedSales, setVintedSales] = useState<VintedSale[]>([])
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [favorites, setFavorites] = useState<Opportunity[]>([])
   const [tab, setTab] = useState<Tab>('annonces')
@@ -18,14 +19,16 @@ export default function VintedAccount() {
   const refresh = async () => {
     setLoading(true)
     try {
-      const [p, l, inv, fav] = await Promise.all([
+      const [p, l, sales, inv, fav] = await Promise.all([
         api.vintedProfile(),
         api.vintedListings(),
+        api.vintedSales(),
         api.inventory(),
         api.opportunities({ status: 'favorite' }),
       ])
       setProfile(p)
       setListings(l.listings || [])
+      setVintedSales(sales.sales || [])
       setInventory(inv)
       setFavorites(fav)
     } finally { setLoading(false) }
@@ -33,13 +36,14 @@ export default function VintedAccount() {
 
   useEffect(() => { refresh() }, [])
 
-  const ventes = inventory.filter(i => ['vendu', 'sold', 'termine'].includes(i.status))
+  const ventesInv = inventory.filter(i => ['vendu', 'sold', 'termine'].includes(i.status))
   const attente = inventory.filter(i => ['achete', 'preparation', 'in_stock'].includes(i.status))
-  const profit = ventes.reduce((s, i) => s + (i.real_profit || 0), 0)
+  const profitInv = ventesInv.reduce((s, i) => s + (i.real_profit || 0), 0)
+  const profitVinted = vintedSales.reduce((s, v) => s + v.price, 0)
 
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: 'annonces', label: 'Mes annonces', count: listings.length },
-    { id: 'ventes', label: 'Mes ventes', count: ventes.length },
+    { id: 'ventes', label: 'Mes ventes', count: vintedSales.length || ventesInv.length },
     { id: 'favoris', label: 'Mes favoris', count: favorites.length },
     { id: 'attente', label: 'En attente', count: attente.length },
     { id: 'stats', label: 'Statistiques', count: 0 },
@@ -99,18 +103,39 @@ export default function VintedAccount() {
 
       {tab === 'annonces' && (
         listings.length === 0 ? (
-          <EmptyState icon={Package} text="Aucune annonce — connectez votre compte Vinted" />
+          <EmptyState icon={Package} text="Aucune annonce — connectez-vous avec vos cookies Vinted" />
         ) : (
           <ListingGrid listings={listings} />
         )
       )}
 
       {tab === 'ventes' && (
-        ventes.length === 0 ? (
-          <EmptyState icon={TrendingUp} text="Aucune vente enregistrée" />
+        vintedSales.length > 0 ? (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500 mb-2">Ventes synchronisées depuis votre compte Vinted</p>
+            {vintedSales.map(v => (
+              <div key={v.id} className="glass-card flex items-center gap-4">
+                <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden shrink-0">
+                  {v.image_url && <img src={v.image_url} alt="" className="w-full h-full object-cover" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{v.title}</p>
+                  <p className="text-xs text-gray-400">{v.brand} · €{v.price.toFixed(0)}</p>
+                </div>
+                {v.url && (
+                  <button onClick={() => window.open(v.url, '_blank')} className="btn-ghost text-xs">
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : ventesInv.length === 0 ? (
+          <EmptyState icon={TrendingUp} text="Aucune vente — connectez vos cookies Vinted pour synchroniser" />
         ) : (
           <div className="space-y-3">
-            {ventes.map(v => (
+            <p className="text-xs text-slate-500 mb-2">Ventes enregistrées dans ResellPro</p>
+            {ventesInv.map(v => (
               <div key={v.id} className="glass-card flex justify-between">
                 <div>
                   <p className="font-medium text-sm">{v.title}</p>
@@ -167,12 +192,12 @@ export default function VintedAccount() {
       {tab === 'stats' && (
         <div className="grid grid-cols-3 gap-4">
           <div className="glass-card text-center py-6">
-            <p className="text-xs text-gray-400">Ventes</p>
-            <p className="text-3xl font-bold">{ventes.length}</p>
+            <p className="text-xs text-gray-400">Ventes Vinted</p>
+            <p className="text-3xl font-bold">{vintedSales.length || ventesInv.length}</p>
           </div>
           <div className="glass-card text-center py-6">
-            <p className="text-xs text-gray-400">Bénéfice</p>
-            <p className="text-3xl font-bold text-emerald-600">€{profit.toFixed(0)}</p>
+            <p className="text-xs text-gray-400">Chiffre d'affaires</p>
+            <p className="text-3xl font-bold text-emerald-600">€{(profitVinted || profitInv).toFixed(0)}</p>
           </div>
           <div className="glass-card text-center py-6">
             <p className="text-xs text-gray-400">Annonces actives</p>

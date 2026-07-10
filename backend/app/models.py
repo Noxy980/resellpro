@@ -129,3 +129,5 @@ class AppSettings(Base):
     monitor_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     poll_interval: Mapped[int] = mapped_column(Integer, default=90)
     ai_recommendation: Mapped[str] = mapped_column(Text, default="")
+    vinted_proxy_encrypted: Mapped[str] = mapped_column(Text, default="")
+    default_scan_minutes: Mapped[int] = mapped_column(Integer, default=15)

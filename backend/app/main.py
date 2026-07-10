@@ -15,7 +15,7 @@ load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
@@ -41,7 +41,7 @@ from .services.openrouter_ai import OpenRouterAI
 from .services.learning_service import LearningService
 from .services.monitor_service import monitor
 from .services.photo_service import OUTPUT_DIR, enhance_photo
-from .services.vinted_account import VintedAccountService
+from .services.vinted_account import VintedAccountService, parse_cookies
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("resellpro")
@@ -66,6 +66,22 @@ def _get_ai(db: Session) -> OpenRouterAI:
         key = decrypt(settings.openai_api_key_encrypted) or key
     _ai_service = OpenRouterAI(key)
     return _ai_service
+
+
+def _apply_vinted_session(db: Session) -> None:
+    """Restore stored Vinted cookies and proxy on the shared client."""
+    settings = db.query(AppSettings).first()
+    if settings and settings.vinted_proxy_encrypted:
+        monitor.client.set_proxy(decrypt(settings.vinted_proxy_encrypted))
+    else:
+        monitor.client.set_proxy(os.environ.get("VINTED_PROXY"))
+
+    session = db.query(VintedSession).first()
+    if session and session.cookies_encrypted:
+        cookies = parse_cookies(decrypt(session.cookies_encrypted))
+        if cookies:
+            monitor.client.config.country = session.country or "fr"
+            monitor.client.apply_cookies(cookies, session.country)
 
 
 def _opp_to_out(record: OpportunityRecord) -> OpportunityOut:
@@ -145,6 +161,7 @@ async def lifespan(app: FastAPI):
             settings.openai_api_key_encrypted = encrypt(DEFAULT_OPENROUTER_KEY)
             db.commit()
             logger.info("OpenRouter API key configured automatically")
+        _apply_vinted_session(db)
     finally:
         db.close()
     if os.environ.get("MONITOR_AUTO_START", "false").lower() == "true":
@@ -179,19 +196,54 @@ def health_check():
 @app.post("/api/vinted/connect")
 def connect_vinted(req: VintedConnectRequest, db: Session = Depends(get_db)):
     try:
-        monitor.client._ensure_session()
+        monitor.client.config.country = req.country
+        if req.cookies:
+            cookies = parse_cookies(req.cookies)
+            if not cookies:
+                raise HTTPException(400, "Format de cookies invalide")
+            monitor.client.apply_cookies(cookies, req.country)
+        else:
+            monitor.client.reset_session()
+            monitor.client._ensure_session()
+
         session = db.query(VintedSession).first()
         if not session:
             session = VintedSession()
             db.add(session)
         session.country = req.country
         session.is_connected = True
-        session.username = "Connected"
+        if req.cookies:
+            session.cookies_encrypted = encrypt(req.cookies.strip())
         session.updated_at = datetime.now(timezone.utc)
+
+        svc = VintedAccountService(monitor.client)
+        profile = svc.get_profile()
+        session.username = profile.get("login") or ("Connecté" if req.cookies else "Session anonyme")
         db.commit()
-        return {"connected": True, "country": req.country, "message": "Vinted session active"}
+
+        return {
+            "connected": True,
+            "country": req.country,
+            "username": session.username,
+            "has_cookies": bool(req.cookies),
+            "message": "Compte Vinted lié" if profile.get("is_connected") else "Session Vinted active (scan public)",
+        }
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(500, f"Connection failed: {exc}")
+        raise HTTPException(500, f"Connection failed: {exc}") from exc
+
+
+@app.post("/api/vinted/disconnect")
+def disconnect_vinted(db: Session = Depends(get_db)):
+    session = db.query(VintedSession).first()
+    if session:
+        session.is_connected = False
+        session.cookies_encrypted = ""
+        session.username = ""
+        db.commit()
+    monitor.client.reset_session()
+    return {"ok": True}
 
 
 @app.get("/api/vinted/status")
@@ -201,6 +253,7 @@ def vinted_status(db: Session = Depends(get_db)):
         "connected": session.is_connected if session else False,
         "country": session.country if session else "fr",
         "username": session.username if session else "",
+        "has_cookies": bool(session and session.cookies_encrypted),
     }
 
 
@@ -280,6 +333,7 @@ def opportunity_action(opp_id: int, action: OpportunityAction, db: Session = Dep
 
 @app.post("/api/opportunities/scan")
 def trigger_scan(reset_seen: bool = False, db: Session = Depends(get_db)):
+    _apply_vinted_session(db)
     try:
         results, stats = monitor.scan_once(reset_seen=reset_seen)
     except Exception as exc:
@@ -290,6 +344,44 @@ def trigger_scan(reset_seen: bool = False, db: Session = Depends(get_db)):
         record = _save_opportunity(db, data)
         saved.append(_opp_to_out(record))
     return {"found": len(saved), "opportunities": saved, "stats": stats}
+
+
+@app.get("/api/opportunities/scan/stream")
+def scan_stream(
+    duration_minutes: int = 15,
+    reset_seen: bool = False,
+    db: Session = Depends(get_db),
+):
+    """SSE stream — emits found opportunities in real time."""
+    duration_minutes = max(1, min(duration_minutes, 120))
+    _apply_vinted_session(db)
+
+    from .database import SessionLocal
+
+    def event_generator():
+        try:
+            for evt in monitor.scan_stream(duration_minutes, reset_seen=reset_seen):
+                if evt.get("event") == "found" and evt.get("opportunity"):
+                    sdb = SessionLocal()
+                    try:
+                        record = _save_opportunity(sdb, evt["opportunity"])
+                        evt["opportunity"] = _opp_to_out(record).model_dump()
+                    finally:
+                        sdb.close()
+                yield f"data: {json.dumps(evt, default=str)}\n\n"
+        except Exception as exc:
+            logger.exception("Scan stream failed")
+            yield f"data: {json.dumps({'event': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/api/vinted/diagnostic")
@@ -391,6 +483,7 @@ def ai_price(brand: str, model: str, condition: str, category: str, db: Session 
 
 @app.get("/api/vinted/profile")
 def vinted_profile(db: Session = Depends(get_db)):
+    _apply_vinted_session(db)
     svc = VintedAccountService(monitor.client)
     profile = svc.get_profile()
     if profile.get("is_connected") and profile.get("login"):
@@ -403,11 +496,22 @@ def vinted_profile(db: Session = Depends(get_db)):
 
 @app.get("/api/vinted/listings")
 def vinted_listings(db: Session = Depends(get_db)):
+    _apply_vinted_session(db)
     svc = VintedAccountService(monitor.client)
     profile = svc.get_profile()
     if not profile.get("id"):
-        return {"listings": [], "message": "Connectez votre compte Vinted"}
+        return {"listings": [], "message": "Connectez votre compte Vinted avec vos cookies"}
     return {"listings": svc.get_my_listings(profile["id"])}
+
+
+@app.get("/api/vinted/sales")
+def vinted_sales(db: Session = Depends(get_db)):
+    _apply_vinted_session(db)
+    svc = VintedAccountService(monitor.client)
+    profile = svc.get_profile()
+    if not profile.get("id"):
+        return {"sales": [], "message": "Cookies Vinted requis pour voir vos ventes"}
+    return {"sales": svc.get_sales(profile["id"])}
 
 
 # ── Draft Listings ─────────────────────────────────────────────────────────
@@ -439,7 +543,13 @@ def create_draft(data: ListingGenerateRequest, db: Session = Depends(get_db)):
     db.add(draft)
     db.commit()
     db.refresh(draft)
-    return {"id": draft.id, **generated, "publish_url": VintedAccountService(monitor.client).prepare_listing_url({})}
+    svc = VintedAccountService(monitor.client)
+    publish_url = svc.prepare_publish_url({
+        "title": draft.title,
+        "description": draft.description,
+        "price": draft.price,
+    })
+    return {"id": draft.id, **generated, "publish_url": publish_url}
 
 
 @app.get("/api/drafts/{draft_id}")
@@ -669,6 +779,8 @@ def get_settings(db: Session = Depends(get_db)):
     return {
         "monitor_enabled": s.monitor_enabled,
         "poll_interval": s.poll_interval,
+        "default_scan_minutes": getattr(s, "default_scan_minutes", 15) or 15,
+        "has_vinted_proxy": bool(getattr(s, "vinted_proxy_encrypted", "")),
         "has_openai_key": bool(s.openai_api_key_encrypted or DEFAULT_OPENROUTER_KEY),
         "ai_provider": "OpenRouter (free models)",
     }
@@ -686,6 +798,11 @@ def update_settings(update: SettingsUpdate, db: Session = Depends(get_db)):
         s.monitor_enabled = update.monitor_enabled
     if update.poll_interval is not None:
         s.poll_interval = update.poll_interval
+    if update.vinted_proxy is not None:
+        s.vinted_proxy_encrypted = encrypt(update.vinted_proxy.strip()) if update.vinted_proxy.strip() else ""
+        monitor.client.set_proxy(update.vinted_proxy.strip() or None)
+    if update.default_scan_minutes is not None:
+        s.default_scan_minutes = max(1, min(update.default_scan_minutes, 120))
     db.commit()
     return {"ok": True}
 

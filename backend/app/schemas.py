@@ -124,12 +124,15 @@ class ListingOptimizeRequest(BaseModel):
 
 class VintedConnectRequest(BaseModel):
     country: str = "fr"
+    cookies: str | None = None
 
 
 class SettingsUpdate(BaseModel):
     openai_api_key: str | None = None
     monitor_enabled: bool | None = None
     poll_interval: int | None = None
+    vinted_proxy: str | None = None
+    default_scan_minutes: int | None = None
 
 
 class StatsOut(BaseModel):
