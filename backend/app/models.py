@@ -112,6 +112,15 @@ class DraftListing(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    role: Mapped[str] = mapped_column(String(16))  # user, assistant
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
 class AppSettings(Base):
     __tablename__ = "app_settings"
 

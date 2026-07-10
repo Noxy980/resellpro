@@ -97,6 +97,16 @@ class ChatResponse(BaseModel):
     ai_available: bool
 
 
+class ChatMessageOut(BaseModel):
+    id: int
+    role: str
+    content: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class ListingGenerateRequest(BaseModel):
     brand: str
     condition: str

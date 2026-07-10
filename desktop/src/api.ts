@@ -12,9 +12,9 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-async function requestOnce<T>(path: string, options?: RequestInit): Promise<T> {
+async function requestOnce<T>(path: string, options?: RequestInit, timeoutMs = TIMEOUT_MS): Promise<T> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const res = await fetch(`${API}${path}`, {
       headers: { 'Content-Type': 'application/json', ...options?.headers },
@@ -105,6 +105,10 @@ export interface VintedProfile {
   is_connected: boolean; error?: string
 }
 
+export interface ChatMessage {
+  id: number; role: string; content: string; created_at: string
+}
+
 export interface DraftListing {
   id: number; title: string; brand: string; price: number
   status: string; created_at: string
@@ -128,12 +132,15 @@ export const api = {
   opportunity: (id: number) => request<Opportunity>(`/opportunities/${id}`),
   opportunityAction: (id: number, action: string) =>
     request(`/opportunities/${id}/action`, { method: 'POST', body: JSON.stringify({ action }) }),
-  scan: (resetSeen = true) =>
-    request<{ found: number; opportunities: Opportunity[]; stats: Record<string, number> }>(
-      `/opportunities/scan?reset_seen=${resetSeen}`, { method: 'POST' }
+  scan: (resetSeen = false) =>
+    requestOnce<{ found: number; opportunities: Opportunity[]; stats: Record<string, unknown> }>(
+      `/opportunities/scan?reset_seen=${resetSeen}`, { method: 'POST' }, 300000
     ),
+  vintedDiagnostic: () => request<{ ok: boolean; error?: string; items_count?: number }>('/vinted/diagnostic'),
   monitorStatus: () => request<{ running: boolean; status: string; last_scan: string | null }>('/monitor/status'),
 
+  chatHistory: () => request<ChatMessage[]>('/ai/history'),
+  clearChatHistory: () => request('/ai/history', { method: 'DELETE' }),
   chat: (message: string, opportunityId?: number) =>
     request<{ reply: string; ai_available: boolean }>('/ai/chat', {
       method: 'POST', body: JSON.stringify({ message, opportunity_id: opportunityId }),

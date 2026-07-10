@@ -47,7 +47,7 @@ export default function Dashboard() {
   const scan = async () => {
     setScanning(true)
     try {
-      await api.scan(true)
+      await api.scan(false)
       await load()
     } finally {
       setScanning(false)

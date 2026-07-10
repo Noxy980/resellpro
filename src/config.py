@@ -83,7 +83,8 @@ def _project_root() -> Path:
 
 
 def load_config(config_path: str | Path | None = None) -> AppConfig:
-    root = _project_root()
+    import os
+    root = Path(os.environ.get("RESELLPRO_ROOT", _project_root()))
     path = Path(config_path) if config_path else root / "config.yaml"
 
     with open(path, encoding="utf-8") as f:
@@ -166,4 +167,6 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
 
 
 def resolve_path(relative: str) -> Path:
-    return _project_root() / relative
+    import os
+    root = Path(os.environ.get("RESELLPRO_ROOT", _project_root()))
+    return root / relative

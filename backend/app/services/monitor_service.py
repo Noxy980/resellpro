@@ -48,7 +48,7 @@ class MonitorService:
             "last_scan": self._last_scan.isoformat() if self._last_scan else None,
             "last_count": len(self._last_results),
             "last_stats": self._last_stats,
-            "seen_count": len(self.store._ids),
+            "vinted_error": self.client.last_error,
             "error": self._error,
         }
 
@@ -71,78 +71,70 @@ class MonitorService:
         self._status = "scanning"
         results: list[dict] = []
         candidates: list[ListingAnalysis] = []
-        stats = {
+        stats: dict = {
             "queries_run": 0,
             "items_fetched": 0,
-            "skipped_seen": 0,
-            "quick_rejected": 0,
             "analyzed": 0,
             "passed": 0,
-            "seen_cleared": 0,
             "errors": 0,
+            "error_samples": [],
         }
 
         if reset_seen:
             stats["seen_cleared"] = self.store.clear()
-            logger.info("Cleared %d seen listings for fresh scan", stats["seen_cleared"])
 
-        queries = list(dict.fromkeys(
-            [b.name for b in self.config.target_brands]
-            + self.optimizer.seasonal_search_queries()
-        ))
+        queries = [b.name for b in self.config.target_brands]
         if self.config.enable_typo_searches:
-            queries.extend(self.optimizer.typo_search_queries())
-        queries = list(dict.fromkeys(queries))[:24]
+            queries.extend(self.optimizer.typo_search_queries()[:6])
+        queries.extend(self.optimizer.seasonal_search_queries()[:8])
+        queries = list(dict.fromkeys(queries))[:16]
 
         for query in queries:
             stats["queries_run"] += 1
             try:
-                items = self.client.search_catalog(query, order="newest_first")
+                items = self.client.search_catalog(query, order="newest_first", per_page=32)
             except Exception as exc:
-                logger.error("Search failed for '%s': %s", query, exc)
-                self.client.reset_session()
+                err = f"{query}: {exc}"
+                logger.error("Search failed: %s", err)
                 stats["errors"] += 1
+                if len(stats["error_samples"]) < 3:
+                    stats["error_samples"].append(err[:200])
+                self.client.reset_session(rotate=True)
                 continue
 
             stats["items_fetched"] += len(items)
+            if not items:
+                continue
+
             items = self.optimizer.prioritize(items)
-            brand_count = 0
+            analyzed_this_query = 0
 
             for item in items:
-                lid = item.get("id")
-                if not lid:
-                    continue
-                lid = int(lid)
-
-                if self.store.is_seen(lid):
-                    stats["skipped_seen"] += 1
-                    continue
+                if analyzed_this_query >= 8:
+                    break
 
                 if not self.analyzer.quick_screen(item):
-                    stats["quick_rejected"] += 1
                     continue
 
-                if brand_count >= self.config.max_analyses_per_brand:
-                    continue
-                brand_count += 1
+                analyzed_this_query += 1
+                lid = int(item.get("id") or 0)
 
                 try:
-                    analysis = self.analyzer.analyze(item)
+                    analysis = self.analyzer.analyze(item, relaxed=True)
                 except Exception as exc:
                     logger.error("Analysis error: %s", exc)
                     stats["errors"] += 1
-                    self.store.mark_seen(lid)
                     continue
 
                 stats["analyzed"] += 1
-                self.store.mark_seen(lid)
-
                 if analysis:
                     stats["passed"] += 1
                     candidates.append(analysis)
+                elif lid:
+                    pass  # ne plus marquer comme vu — l'utilisateur veut revoir les annonces
 
         candidates.sort(key=lambda a: (-a.opportunity_score, -a.potential_profit))
-        top = candidates[: self.config.criteria.max_alerts_per_cycle * 3]
+        top = candidates[: max(self.config.criteria.max_alerts_per_cycle * 2, 10)]
 
         for a in top:
             d = self._to_dict(a)
@@ -150,24 +142,20 @@ class MonitorService:
             if self._on_opportunity:
                 self._on_opportunity(d)
 
-        self.store.flush()
-        self.store.prune()
         self.knowledge_store.flush()
         self._last_scan = datetime.now(timezone.utc)
         self._last_results = results
         self._last_stats = stats
         self._status = "idle"
-        self._error = None
-        logger.info(
-            "Scan done: %d found, %d analyzed, %d passed, %d skipped seen",
-            len(results), stats["analyzed"], stats["passed"], stats["skipped_seen"],
-        )
+        self._error = stats["error_samples"][0] if stats["error_samples"] and not results else None
+        logger.info("Scan: %d results, %d fetched, %d analyzed, %d errors",
+                    len(results), stats["items_fetched"], stats["analyzed"], stats["errors"])
         return results, stats
 
     def _loop(self) -> None:
         while self._running:
             try:
-                self.scan_once(reset_seen=False)
+                self.scan_once()
             except Exception as exc:
                 self._error = str(exc)
                 self._status = "error"
@@ -210,7 +198,7 @@ class MonitorService:
             items = self.client.search_catalog(str(vinted_id), per_page=5)
             for item in items:
                 if int(item.get("id", 0)) == vinted_id:
-                    analysis = self.analyzer.analyze(item)
+                    analysis = self.analyzer.analyze(item, relaxed=True)
                     return self._to_dict(analysis) if analysis else None
         except Exception as exc:
             logger.error("Manual analyze error: %s", exc)

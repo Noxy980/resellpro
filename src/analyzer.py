@@ -155,7 +155,7 @@ class ListingAnalyzer:
         )
         return result.is_candidate
 
-    def analyze(self, item: dict[str, Any]) -> ListingAnalysis | None:
+    def analyze(self, item: dict[str, Any], *, relaxed: bool = False) -> ListingAnalysis | None:
         listing_id = int(item["id"])
         price, currency = _parse_price(item)
         brand = item.get("brand_title") or ""
@@ -273,11 +273,13 @@ class ListingAnalyzer:
         )
 
         if not expert.reseller_approved:
-            logger.debug(
-                "Rejected by reseller gate: %s (score %d, days %d, demand %s)",
-                title, expert.total, sales.estimated_days_to_sell, demand.level,
-            )
-            return None
+            if not relaxed or expert.total < 55 or profit < 8:
+                logger.debug(
+                    "Rejected by reseller gate: %s (score %d, days %d, demand %s)",
+                    title, expert.total, sales.estimated_days_to_sell, demand.level,
+                )
+                return None
+            logger.info("Relaxed pass: %s (score %d)", title, expert.total)
 
         self.knowledge_store.kb.learn(
             brand, model, price, estimated_resale, profit, sales.estimated_days_to_sell,

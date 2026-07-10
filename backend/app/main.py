@@ -20,10 +20,11 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from .database import get_db, init_db
-from .models import AppSettings, DraftListing, InventoryItem, OpportunityRecord, VintedSession
+from .models import AppSettings, ChatMessage, DraftListing, InventoryItem, OpportunityRecord, VintedSession
 from .schemas import (
     ChatRequest,
     ChatResponse,
+    ChatMessageOut,
     InventoryCreate,
     InventoryOut,
     InventoryUpdate,
@@ -278,13 +279,22 @@ def opportunity_action(opp_id: int, action: OpportunityAction, db: Session = Dep
 
 
 @app.post("/api/opportunities/scan")
-def trigger_scan(reset_seen: bool = True, db: Session = Depends(get_db)):
-    results, stats = monitor.scan_once(reset_seen=reset_seen)
+def trigger_scan(reset_seen: bool = False, db: Session = Depends(get_db)):
+    try:
+        results, stats = monitor.scan_once(reset_seen=reset_seen)
+    except Exception as exc:
+        logger.exception("Scan failed")
+        raise HTTPException(500, detail=str(exc)) from exc
     saved = []
     for data in results:
         record = _save_opportunity(db, data)
         saved.append(_opp_to_out(record))
     return {"found": len(saved), "opportunities": saved, "stats": stats}
+
+
+@app.get("/api/vinted/diagnostic")
+def vinted_diagnostic():
+    return monitor.client.test_connection()
 
 
 @app.get("/api/monitor/status")
@@ -293,6 +303,24 @@ def monitor_status():
 
 
 # ── AI Assistant ───────────────────────────────────────────────────────────
+
+@app.get("/api/ai/history", response_model=list[ChatMessageOut])
+def get_chat_history(limit: int = 200, db: Session = Depends(get_db)):
+    msgs = (
+        db.query(ChatMessage)
+        .order_by(ChatMessage.created_at.asc())
+        .limit(limit)
+        .all()
+    )
+    return msgs
+
+
+@app.delete("/api/ai/history")
+def clear_chat_history(db: Session = Depends(get_db)):
+    db.query(ChatMessage).delete()
+    db.commit()
+    return {"ok": True}
+
 
 @app.post("/api/ai/chat", response_model=ChatResponse)
 def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
@@ -307,7 +335,15 @@ def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
                 "score": record.score, "demand_level": record.demand_level,
                 "selling_speed": record.selling_speed, "why_buy": record.why_buy, "risk": record.risk,
             }}
+
+    db.add(ChatMessage(role="user", content=req.message))
+    db.commit()
+
     reply = ai.chat(req.message, context)
+
+    db.add(ChatMessage(role="assistant", content=reply))
+    db.commit()
+
     return ChatResponse(reply=reply, ai_available=ai.available)
 
 

@@ -29,21 +29,28 @@ export default function Opportunities() {
 
   const scan = async () => {
     setScanning(true)
-    setScanMsg('Recherche sur Vinted... (30-90 secondes)')
+    setScanMsg('Recherche sur Vinted... (peut prendre 2-3 minutes)')
     try {
-      const res = await api.scan(true)
-      const s = res.stats || {}
-      setScanMsg(
-        res.found > 0
-          ? `${res.found} opportunité(s) trouvée(s) !`
-          : `Scan terminé — ${s.analyzed || 0} analysés, ${s.passed || 0} validés. Réessayez dans quelques minutes.`
-      )
+      const res = await api.scan(false)
+      const s = res.stats as Record<string, unknown>
+      const errors = (s.error_samples as string[]) || []
+      if (res.found > 0) {
+        setScanMsg(`${res.found} opportunité(s) trouvée(s) !`)
+      } else if (Number(s.items_fetched) === 0 && Number(s.errors) > 0) {
+        setScanMsg(
+          `Vinted inaccessible depuis le serveur. ${errors[0] || 'Erreur réseau'} — Redéployez Render après la mise à jour.`
+        )
+      } else {
+        setScanMsg(
+          `Scan terminé — ${s.items_fetched || 0} annonces vues, ${s.analyzed || 0} analysées, ${s.passed || 0} validées.`
+        )
+      }
       refresh()
-    } catch {
-      setScanMsg('Erreur de scan — vérifiez que l\'API est en ligne.')
+    } catch (e) {
+      setScanMsg(e instanceof Error ? e.message : 'Erreur de scan — attendez que Render se réveille.')
     } finally {
       setScanning(false)
-      setTimeout(() => setScanMsg(''), 8000)
+      setTimeout(() => setScanMsg(''), 12000)
     }
   }
 

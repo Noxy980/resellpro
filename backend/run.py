@@ -6,8 +6,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 root = Path(os.environ.get("RESELLPRO_ROOT", Path(__file__).resolve().parent.parent))
+os.environ.setdefault("RESELLPRO_ROOT", str(root))
 load_dotenv(root / ".env")
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import uvicorn
 

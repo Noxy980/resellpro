@@ -89,7 +89,10 @@ class SearchOptimizer:
                 return PreScreenResult(0, False, False, None, False, "category mismatch")
 
         if brand.lower() not in brand_lookup and self.config.target_brands:
-            return PreScreenResult(0, False, False, None, False, "brand not targeted")
+            title_lower = title.lower()
+            brand_in_title = any(b.name.lower() in title_lower for b in self.config.target_brands)
+            if not brand_in_title:
+                return PreScreenResult(0, False, False, None, False, "brand not targeted")
 
         text = title.lower()
         if any(flag in text for flag in self.config.title_red_flags):
