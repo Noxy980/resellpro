@@ -116,6 +116,7 @@ export const api = {
 
   statistics: () => request<Stats>('/statistics'),
   dashboard: () => request<Record<string, unknown>>('/dashboard'),
+  dashboardAiTip: () => request<{ tip: string }>('/dashboard/ai-tip'),
   deleteInventory: (id: number) => request(`/inventory/${id}`, { method: 'DELETE' }),
   profile: () => request<Record<string, unknown>>('/profile'),
   settings: () => request<Record<string, unknown>>('/settings'),

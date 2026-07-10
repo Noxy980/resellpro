@@ -1,37 +1,45 @@
 import { useEffect, useState } from 'react'
-import { Wifi, WifiOff } from 'lucide-react'
+import { WifiOff, RefreshCw } from 'lucide-react'
 import { api, getApiBase } from '../api'
 
 export default function ApiBanner() {
   const [online, setOnline] = useState<boolean | null>(null)
 
-  useEffect(() => {
+  const check = () => {
     api.monitorStatus()
       .then(() => setOnline(true))
       .catch(() => setOnline(false))
-  }, [])
+  }
+
+  useEffect(() => { check() }, [])
 
   if (online === null || online) return null
 
   const missingUrl = import.meta.env.PROD && !import.meta.env.VITE_API_URL
 
   return (
-    <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center gap-3 text-sm text-amber-900">
-      <WifiOff className="w-4 h-4 shrink-0" />
+    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200/80 px-4 py-3 flex items-start gap-3 text-sm text-amber-900 relative z-50">
+      <WifiOff className="w-5 h-5 shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         {missingUrl ? (
-          <span>
-            <strong>API non configurée.</strong> Ajoutez la variable{' '}
-            <code className="bg-amber-100 px-1 rounded">VITE_API_URL</code> dans Netlify
-            (ex. https://votre-api.onrender.com/api).
-          </span>
+          <>
+            <p className="font-bold">API non configurée sur Netlify</p>
+            <p className="text-xs mt-1 text-amber-700">
+              Ajoutez <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">VITE_API_URL</code> puis redéployez.
+            </p>
+          </>
         ) : (
-          <span>
-            Impossible de joindre l'API ({getApiBase()}). Vérifiez que le backend est déployé et en ligne.
-          </span>
+          <>
+            <p className="font-bold">Backend hors ligne</p>
+            <p className="text-xs mt-1 text-amber-700 truncate">
+              {getApiBase()} — Render peut mettre 30s à démarrer (plan gratuit).
+            </p>
+          </>
         )}
       </div>
-      <Wifi className="w-4 h-4 opacity-40 shrink-0" />
+      <button onClick={check} className="shrink-0 p-2 rounded-xl bg-white/80 hover:bg-white border border-amber-200">
+        <RefreshCw className="w-4 h-4" />
+      </button>
     </div>
   )
 }

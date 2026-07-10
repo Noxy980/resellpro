@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Search, RefreshCw, SlidersHorizontal, Sparkles } from 'lucide-react'
+import { Search, RefreshCw, SlidersHorizontal, Sparkles, Zap } from 'lucide-react'
 import { api, Opportunity } from '../api'
 import { useOpportunities } from '../hooks'
 import OpportunityDetail from '../components/OpportunityDetail'
+import PageShell from '../components/PageShell'
 
 function ScoreBadge({ score }: { score: number }) {
   const cls = score >= 80 ? 'score-high' : score >= 70 ? 'score-mid' : 'score-low'
@@ -38,33 +39,33 @@ export default function Opportunities() {
   ]
 
   return (
-    <div className="p-8 max-w-6xl mx-auto animate-fade-in">
-      <div className="flex items-start justify-between mb-8">
+    <PageShell>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 md:mb-8">
         <div>
           <h1 className="page-title">Opportunités</h1>
           <p className="page-subtitle">Les meilleures affaires sélectionnées par l'IA</p>
         </div>
-        <button onClick={scan} disabled={scanning} className="btn-primary">
+        <button onClick={scan} disabled={scanning} className="btn-primary w-full sm:w-auto">
           <RefreshCw className={`w-4 h-4 ${scanning ? 'animate-spin' : ''}`} />
-          {scanning ? 'Analyse...' : 'Scanner'}
+          {scanning ? 'Analyse...' : 'Scanner Vinted'}
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3.5 top-3 w-4 h-4 text-gray-400" />
-          <input className="input pl-10" placeholder="Rechercher..." value={search}
+      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 mb-6">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
+          <input className="input pl-11" placeholder="Rechercher une marque, un modèle..." value={search}
             onChange={e => setSearch(e.target.value)} />
         </div>
-        <div className="flex gap-1 bg-white/60 rounded-xl p-1 border border-gray-100">
+        <div className="flex gap-1 bg-white rounded-2xl p-1 border border-slate-200/80 shadow-soft overflow-x-auto">
           {tabs.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                tab === t.id ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'
+              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                tab === t.id ? 'bg-violet-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
               }`}>{t.label}</button>
           ))}
         </div>
-        <button onClick={() => setShowFilters(!showFilters)} className="btn-secondary text-xs">
+        <button onClick={() => setShowFilters(!showFilters)} className="btn-secondary text-xs shrink-0">
           <SlidersHorizontal className="w-3.5 h-3.5" />Filtres
         </button>
       </div>
@@ -100,19 +101,26 @@ export default function Opportunities() {
       )}
 
       {loading ? (
-        <div className="text-center py-20 text-gray-400">Chargement...</div>
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => <div key={i} className="skeleton h-32 rounded-3xl" />)}
+        </div>
       ) : data.length === 0 ? (
-        <div className="text-center py-20">
-          <Sparkles className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">Aucune opportunité pour le moment</p>
-          <p className="text-sm text-gray-400 mt-1">Cliquez sur Scanner pour trouver des affaires</p>
+        <div className="glass-card text-center py-16 border-dashed border-2 border-slate-200">
+          <div className="w-20 h-20 mx-auto mb-5 rounded-3xl bg-violet-50 flex items-center justify-center">
+            <Zap className="w-10 h-10 text-violet-500" />
+          </div>
+          <p className="font-bold text-slate-900 text-lg">Aucune opportunité</p>
+          <p className="text-sm text-slate-500 mt-2 mb-6">Lancez un scan pour découvrir les meilleures affaires</p>
+          <button onClick={scan} disabled={scanning} className="btn-primary">
+            <Sparkles className="w-4 h-4" /> Scanner maintenant
+          </button>
         </div>
       ) : (
         <div className="grid gap-4">
           {data.map(opp => (
-            <div key={opp.id} className="glass-card cursor-pointer group" onClick={() => setSelected(opp)}>
-              <div className="flex gap-5">
-                <div className="w-28 h-28 rounded-xl overflow-hidden bg-gray-100 shrink-0">
+            <div key={opp.id} className="glass-card cursor-pointer group active:scale-[0.99]" onClick={() => setSelected(opp)}>
+              <div className="flex gap-4 md:gap-5">
+                <div className="w-20 h-20 md:w-28 md:h-28 rounded-2xl overflow-hidden bg-slate-100 shrink-0 ring-2 ring-white shadow-md">
                   {opp.image_url
                     ? <img src={opp.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">Photo</div>}
@@ -125,12 +133,11 @@ export default function Opportunities() {
                     </div>
                     <ScoreBadge score={opp.score} />
                   </div>
-                  <div className="flex items-center gap-5 mt-3">
-                    <div><p className="text-[11px] text-gray-400">Achat</p><p className="font-semibold">€{opp.price.toFixed(0)}</p></div>
-                    <div className="text-gray-300">→</div>
-                    <div><p className="text-[11px] text-gray-400">Revente</p><p className="font-semibold text-emerald-600">€{opp.estimated_resale.toFixed(0)}</p></div>
-                    <div><p className="text-[11px] text-gray-400">Profit</p><p className="font-semibold text-emerald-600">+€{opp.potential_profit.toFixed(0)}</p></div>
-                    <div><p className="text-[11px] text-gray-400">Vitesse</p><p className="text-sm">{opp.selling_speed}</p></div>
+                  <div className="flex flex-wrap items-center gap-3 md:gap-5 mt-3">
+                    <div><p className="text-[10px] text-slate-400 font-medium uppercase">Achat</p><p className="font-bold">€{opp.price.toFixed(0)}</p></div>
+                    <div className="text-slate-300 hidden sm:block">→</div>
+                    <div><p className="text-[10px] text-slate-400 font-medium uppercase">Revente</p><p className="font-bold text-emerald-600">€{opp.estimated_resale.toFixed(0)}</p></div>
+                    <div><p className="text-[10px] text-slate-400 font-medium uppercase">Profit</p><p className="font-bold text-emerald-600">+€{opp.potential_profit.toFixed(0)}</p></div>
                   </div>
                   <div className="flex items-center gap-2 mt-2.5">
                     <DemandBadge level={opp.demand_level} />
@@ -147,6 +154,6 @@ export default function Opportunities() {
       )}
 
       {selected && <OpportunityDetail opportunity={selected} onClose={() => setSelected(null)} onAction={() => { setSelected(null); refresh() }} />}
-    </div>
+    </PageShell>
   )
 }

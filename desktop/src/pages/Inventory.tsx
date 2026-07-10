@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, Package, Pencil, Trash2, X, CheckCircle } from 'lucide-react'
 import { api, InventoryItem } from '../api'
+import PageShell from '../components/PageShell'
 
 const STATUSES: Record<string, string> = {
   achete: 'Acheté',
@@ -92,13 +93,13 @@ export default function Inventory() {
   const roiCount = items.filter(i => i.real_profit && i.purchase_price > 0).length
 
   return (
-    <div className="p-8 max-w-5xl mx-auto animate-fade-in">
-      <div className="flex items-center justify-between mb-8">
+    <PageShell>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 md:mb-8">
         <div>
           <h1 className="page-title">Stock</h1>
           <p className="page-subtitle">Gestion complète de vos articles — achat, préparation, vente</p>
         </div>
-        <button onClick={openCreate} className="btn-primary">
+        <button onClick={openCreate} className="btn-primary w-full sm:w-auto">
           <Plus className="w-4 h-4" />Ajouter
         </button>
       </div>
@@ -220,6 +221,6 @@ export default function Inventory() {
           })}
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

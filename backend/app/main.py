@@ -511,13 +511,12 @@ def get_dashboard(db: Session = Depends(get_db)):
     total_profit = sum(i.actual_sale_price - i.purchase_price for i in sold)
     potential = sum(o.potential_profit for o in opps)
 
-    ai = _get_ai(db)
-    ai_tip = ""
-    if ai.available:
-        ai_tip = ai.chat(
-            f"Donne UN conseil court (2 phrases max) pour un revendeur Vinted en {season.name}. "
-            "Quoi acheter cette saison ?"
-        )
+    tips = {
+        "été": "Privilégiez les t-shirts Nike/Adidas, shorts Carhartt et sneakers légères — forte demande estivale.",
+        "hiver": "Ciblez doudounes The North Face, pulls Stone Island et boots — les marges hivernales sont excellentes.",
+        "printemps": "Vestes légères, sweats et polos Lacoste se vendent vite en transition de saison.",
+        "automne": "Parkas, fleece Patagonia et cargos Carhartt — préparez le stock avant la montée des prix.",
+    }
 
     return {
         "season": season.name,
@@ -528,9 +527,31 @@ def get_dashboard(db: Session = Depends(get_db)):
         "stock_count": len([i for i in inventory if i.status not in sold_statuses | {"envoye", "shipped"}]),
         "sold_count": len(sold),
         "total_profit": round(total_profit, 2),
-        "ai_recommendation": ai_tip,
+        "ai_recommendation": tips.get(season.name, "Scannez les opportunités pour démarrer votre activité."),
         "monitor": monitor.status,
     }
+
+
+@app.get("/api/dashboard/ai-tip")
+def get_dashboard_ai_tip(db: Session = Depends(get_db)):
+    """Optional slow endpoint — AI tip loaded separately so dashboard stays fast."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+    from src.seasonal import get_current_season
+
+    season = get_current_season()
+    ai = _get_ai(db)
+    if not ai.available:
+        return {"tip": "Configurez votre clé OpenRouter pour des conseils personnalisés."}
+    try:
+        tip = ai.chat(
+            f"Donne UN conseil court (2 phrases max) pour un revendeur Vinted en {season.name}. "
+            "Quoi acheter cette saison ?"
+        )
+        return {"tip": tip}
+    except Exception:
+        return {"tip": "Conseil IA indisponible pour le moment."}
 
 
 # ── Statistics ─────────────────────────────────────────────────────────────
