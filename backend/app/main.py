@@ -49,8 +49,12 @@ learning = LearningService()
 _ai_service: OpenRouterAI | None = None
 
 DEFAULT_OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-_cors_origins = os.environ.get("ALLOWED_ORIGINS", "*")
-CORS_ORIGINS = ["*"] if _cors_origins.strip() == "*" else [o.strip() for o in _cors_origins.split(",") if o.strip()]
+_cors_origins = os.environ.get("ALLOWED_ORIGINS", "*").strip()
+CORS_ORIGINS = (
+    ["*"]
+    if _cors_origins in ("", "*")
+    else [o.strip() for o in _cors_origins.split(",") if o.strip()]
+)
 
 
 def _get_ai(db: Session) -> OpenRouterAI:
@@ -151,11 +155,18 @@ app = FastAPI(title="ResellPro", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"] if "*" in CORS_ORIGINS else CORS_ORIGINS,
+    allow_origin_regex=r"https://.*\.netlify\.app$",
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/api/health")
+def health_check():
+    """Réponse rapide — utilisé pour réveiller Render (plan gratuit)."""
+    return {"ok": True, "service": "resellpro", "status": monitor.status.get("status", "idle")}
 
 
 # ── Auth / Vinted ──────────────────────────────────────────────────────────

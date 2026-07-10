@@ -9,11 +9,11 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: python run.py
-    healthCheckPath: /api/monitor/status
+    healthCheckPath: /api/health
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"
       - key: OPENROUTER_API_KEY
         sync: false
       - key: ALLOWED_ORIGINS
-        value: "https://votre-site.netlify.app"
+        value: "*"

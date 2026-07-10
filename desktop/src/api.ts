@@ -1,32 +1,76 @@
-const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8420/api'
+const RENDER_API = 'https://resellpro-api.onrender.com/api'
 const IS_PROD = import.meta.env.PROD
-const TIMEOUT_MS = IS_PROD ? 20000 : 8000
+const API = import.meta.env.VITE_API_URL || (IS_PROD ? RENDER_API : 'http://127.0.0.1:8420/api')
+const TIMEOUT_MS = IS_PROD ? 90000 : 8000
+const RETRIES = IS_PROD ? 4 : 1
 
 export function getApiBase(): string {
   return API.replace(/\/$/, '')
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function requestOnce<T>(path: string, options?: RequestInit): Promise<T> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
     const res = await fetch(`${API}${path}`, {
       headers: { 'Content-Type': 'application/json', ...options?.headers },
       signal: controller.signal,
+      mode: 'cors',
       ...options,
     })
-    if (!res.ok) throw new Error(await res.text())
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(text || `Erreur HTTP ${res.status}`)
+    }
     return res.json()
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error('Le serveur met trop de temps à répondre. Vérifiez que l\'API backend est en ligne.')
+      throw new Error(
+        'Le serveur Render met trop de temps à répondre (plan gratuit = jusqu\'à 60s au réveil). Réessayez.'
+      )
     }
-    if (IS_PROD && !import.meta.env.VITE_API_URL) {
-      throw new Error('API non configurée. Définissez VITE_API_URL sur Netlify.')
+    if (err instanceof TypeError && IS_PROD) {
+      throw new Error(
+        'Connexion bloquée par le navigateur (CORS). Redéployez le backend Render avec ALLOWED_ORIGINS=*.'
+      )
     }
     throw err
   } finally {
     clearTimeout(timeout)
+  }
+}
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < RETRIES; attempt++) {
+    try {
+      return await requestOnce<T>(path, options)
+    } catch (err) {
+      lastError = err
+      if (attempt < RETRIES - 1) {
+        await sleep(2500 * (attempt + 1))
+      }
+    }
+  }
+  throw lastError
+}
+
+/** Ping rapide pour réveiller Render — appelé au démarrage de l'app. */
+export async function wakeApi(): Promise<boolean> {
+  try {
+    await requestOnce<{ ok: boolean }>('/health')
+    return true
+  } catch {
+    try {
+      await request<{ ok: boolean }>('/health')
+      return true
+    } catch {
+      return false
+    }
   }
 }
 
@@ -67,6 +111,7 @@ export interface DraftListing {
 }
 
 export const api = {
+  health: () => request<{ ok: boolean }>('/health'),
   connectVinted: (country = 'fr') =>
     request<{ connected: boolean }>('/vinted/connect', { method: 'POST', body: JSON.stringify({ country }) }),
 
