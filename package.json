@@ -1,0 +1,11 @@
+{
+  "name": "resellpro",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ResellPro — assistant revendeur Vinted",
+  "scripts": {
+    "dev": "npm run dev --prefix desktop",
+    "build": "npm run build --prefix desktop",
+    "preview": "npm run preview --prefix desktop"
+  }
+}

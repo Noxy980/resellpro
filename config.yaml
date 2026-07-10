@@ -1,0 +1,291 @@
+# =============================================================================
+# Vinted Expert Resale Assistant — Configuration
+# =============================================================================
+
+vinted:
+  country: "fr"
+  poll_interval_seconds: 90
+  listings_per_search: 48
+  request_delay_seconds: 1.5
+  max_analyses_per_brand: 12
+  min_prescreen_score: 25
+  enable_typo_searches: true
+
+discord:
+  webhook_url: "https://discord.com/api/webhooks/1525078459284721778/xgOLYNaA_wcR_U75gumMAL-Ca14V832JO2kgXWPtxEy0QPmTLn2PBPjBZSRsFOp9JG-I"
+
+# ---------------------------------------------------------------------------
+# Target brands
+# ---------------------------------------------------------------------------
+target_brands:
+  - name: "Nike"
+    popularity: 90
+    resale_ease: 85
+  - name: "Adidas"
+    popularity: 88
+    resale_ease: 82
+  - name: "The North Face"
+    popularity: 85
+    resale_ease: 80
+  - name: "Carhartt"
+    popularity: 82
+    resale_ease: 78
+  - name: "Ralph Lauren"
+    popularity: 80
+    resale_ease: 75
+  - name: "Lacoste"
+    popularity: 78
+    resale_ease: 72
+  - name: "Stone Island"
+    popularity: 92
+    resale_ease: 88
+  - name: "Patagonia"
+    popularity: 84
+    resale_ease: 80
+  - name: "Arc'teryx"
+    popularity: 90
+    resale_ease: 85
+  - name: "Supreme"
+    popularity: 95
+    resale_ease: 90
+
+# ---------------------------------------------------------------------------
+# Hot models — high-demand items that sell fast
+# aliases includes common seller typos for typo-search
+# ---------------------------------------------------------------------------
+hot_models:
+  - brand: "Nike"
+    canonical: "Tech Fleece"
+    aliases: ["tech flece", "tech fleeс", "tek fleece", "techfleece", "tech flce"]
+    demand_boost: 30
+    avg_resale_price: 65
+    resale_speed_days: 10
+  - brand: "Nike"
+    canonical: "Air Max 90"
+    aliases: ["airmax 90", "air max90", "am90", "air max"]
+    demand_boost: 25
+    avg_resale_price: 70
+    resale_speed_days: 14
+  - brand: "Nike"
+    canonical: "Dunk Low"
+    aliases: ["dunk", "dunck", "dunk low"]
+    demand_boost: 28
+    avg_resale_price: 80
+    resale_speed_days: 12
+  - brand: "The North Face"
+    canonical: "Nuptse"
+    aliases: ["nuptse", "nupste", "1996"]
+    demand_boost: 30
+    avg_resale_price: 150
+    resale_speed_days: 14
+  - brand: "Stone Island"
+    canonical: "Soft Shell"
+    aliases: ["softshell", "soft shell", "soft shel"]
+    demand_boost: 28
+    avg_resale_price: 200
+    resale_speed_days: 21
+  - brand: "Carhartt"
+    canonical: "Detroit Jacket"
+    aliases: ["detroit", "detroit jacker", "detroit jacke"]
+    demand_boost: 25
+    avg_resale_price: 90
+    resale_speed_days: 18
+  - brand: "Adidas"
+    canonical: "Samba"
+    aliases: ["samba", "sambas", "samba og"]
+    demand_boost: 30
+    avg_resale_price: 75
+    resale_speed_days: 10
+  - brand: "Arc'teryx"
+    canonical: "Beta AR"
+    aliases: ["beta ar", "beta", "arcteryx beta"]
+    demand_boost: 28
+    avg_resale_price: 350
+    resale_speed_days: 21
+  - brand: "Supreme"
+    canonical: "Box Logo"
+    aliases: ["box logo", "bogo", "boxlogo", "box log"]
+    demand_boost: 35
+    avg_resale_price: 120
+    resale_speed_days: 14
+
+# ---------------------------------------------------------------------------
+# Stricter expert criteria — quality over quantity
+# ---------------------------------------------------------------------------
+criteria:
+  max_purchase_price: 80.0
+  min_expected_profit: 15.0
+  min_profit_percent: 30.0
+  min_opportunity_score: 75
+  min_comparable_samples: 5
+  min_quick_sale_probability: 50.0
+  max_days_to_sell: 45
+  max_alerts_per_cycle: 3
+
+target_categories:
+  - "veste"
+  - "jacket"
+  - "sweat"
+  - "hoodie"
+  - "polo"
+  - "pantalon"
+  - "jean"
+  - "sneaker"
+  - "basket"
+  - "boot"
+  - "chemise"
+  - "shirt"
+  - "pull"
+  - "manteau"
+  - "coat"
+  - "jogger"
+  - "cargo"
+  - "shell"
+  - "nuptse"
+  - "dunk"
+  - "samba"
+  - "fleece"
+
+title_red_flags:
+  - "abîmé"
+  - "abime"
+  - "déchiré"
+  - "dechire"
+  - "trou"
+  - "tache"
+  - "défaut"
+  - "defaut"
+  - "réplique"
+  - "replique"
+  - "fake"
+  - "contrefaçon"
+  - "sans lacets"
+  - "incomplet"
+  - "pour pièces"
+  - "pour pieces"
+  - "jaunie"
+  - "décoloré"
+  - "decolore"
+
+# ---------------------------------------------------------------------------
+# Demand intelligence
+# ---------------------------------------------------------------------------
+demand:
+  category_demand:
+    sneaker: 90
+    dunk: 95
+    samba: 92
+    vest: 80
+    veste: 80
+    jacket: 80
+    nuptse: 88
+    fleece: 82
+    hoodie: 78
+    sweat: 78
+    stone island: 90
+    carhartt: 82
+    arc'teryx: 88
+    supreme: 93
+    polo: 65
+    chemise: 55
+    pantalon: 60
+    jean: 62
+    autre: 40
+  rare_models:
+    - "box logo"
+    - "nuptse 1996"
+    - "beta ar"
+    - "soft shell"
+    - "detroit jacket"
+    - "tech fleece"
+    - "vintage 90s"
+    - "archive"
+    - "deadstock"
+
+# ---------------------------------------------------------------------------
+# Aesthetic & style analysis
+# ---------------------------------------------------------------------------
+aesthetic:
+  trending_styles:
+    - "vintage"
+    - "y2k"
+    - "streetwear"
+    - "gorpcore"
+    - "archive"
+    - "retro"
+    - "oversized"
+    - "baggy"
+    - "cargo"
+    - "deadstock"
+    - "90s"
+    - "00s"
+  dated_styles:
+    - "skinny"
+    - "slim fit"
+    - "pointu"
+    - "strass"
+    - "sequin"
+    - "fluo"
+    - "neon"
+    - " années 80"
+    - "annees 80"
+  appealing_colors:
+    - "noir"
+    - "black"
+    - "navy"
+    - "bleu"
+    - "blanc"
+    - "white"
+    - "beige"
+    - "camel"
+    - "gris"
+    - "grey"
+    - "olive"
+    - "khaki"
+    - "bordeaux"
+    - "cream"
+  hard_to_sell_signals:
+    - "personnalisé"
+    - "personnalise"
+    - "custom"
+    - "brodé"
+    - "brode"
+    - "festival"
+    - "carnaval"
+    - "halloween"
+    - "noël"
+    - "noel"
+    - "stagiaire"
+    - "entreprise"
+    - "promo"
+    - "goodie"
+    - "basic"
+    - "basique"
+    - "primark"
+    - "shein"
+    - "temu"
+
+# ---------------------------------------------------------------------------
+# Resale estimation
+# ---------------------------------------------------------------------------
+resale:
+  selling_cost_percent: 10.0
+  fixed_cost_per_item: 2.0
+  conservative_discount_percent: 5.0
+
+condition_multipliers:
+  "neuf avec étiquette": 1.00
+  "neuf avec etiquette": 1.00
+  "neuf sans étiquette": 0.95
+  "neuf sans etiquette": 0.95
+  "très bon état": 0.88
+  "tres bon etat": 0.88
+  "bon état": 0.75
+  "bon etat": 0.75
+  "satisfaisant": 0.60
+  default: 0.70
+
+storage:
+  seen_listings_file: "data/seen_listings.json"
+  knowledge_base_file: "data/knowledge_base.json"
+  cache_ttl_seconds: 3600

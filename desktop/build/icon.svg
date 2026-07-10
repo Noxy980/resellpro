@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#111827"/>
+      <stop offset="100%" style="stop-color:#1f2937"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="48" fill="url(#bg)"/>
+  <path d="M80 180 L128 60 L176 180" stroke="none" fill="none"/>
+  <polyline points="80,160 128,76 176,160" fill="none" stroke="#10b981" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="128" cy="180" r="12" fill="#8b5cf6"/>
+  <text x="128" y="220" text-anchor="middle" fill="#f9fafb" font-family="system-ui,sans-serif" font-size="28" font-weight="700">RP</text>
+</svg>

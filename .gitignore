@@ -1,0 +1,28 @@
+# Runtime data
+data/seen_listings.json
+data/knowledge_base.json
+data/resellpro.db
+data/.local_key
+data/enhanced_photos/
+.env
+
+# Desktop
+desktop/node_modules/
+desktop/dist/
+desktop/release/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

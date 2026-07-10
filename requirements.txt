@@ -1,0 +1,4 @@
+curl_cffi>=0.7.0
+PyYAML>=6.0
+# Optional — enables AI photo analysis when OPENAI_API_KEY is set
+openai>=1.0.0
