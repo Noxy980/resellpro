@@ -46,9 +46,12 @@ function OppCard({ opp, onSelect }: { opp: Opportunity; onSelect: () => void }) 
             </div>
             <ScoreBadge score={opp.score} />
           </div>
-          <div className="flex flex-wrap items-center gap-3 md:gap-5 mt-3">
-            <div><p className="text-[10px] text-slate-400 font-medium uppercase">Achat</p><p className="font-bold">€{opp.price.toFixed(0)}</p></div>
-            <div className="text-slate-300 hidden sm:block">→</div>
+                  <div className="flex flex-wrap items-center gap-3 md:gap-5 mt-3">
+                    <div><p className="text-[10px] text-slate-400 font-medium uppercase">Achat</p><p className="font-bold">€{opp.price.toFixed(0)}</p></div>
+                    {opp.comparable_median != null && opp.comparable_median > 0 && (
+                      <div><p className="text-[10px] text-slate-400 font-medium uppercase">Marché</p><p className="font-bold text-slate-600">€{opp.comparable_median.toFixed(0)}</p></div>
+                    )}
+                    <div className="text-slate-300 hidden sm:block">→</div>
             <div><p className="text-[10px] text-slate-400 font-medium uppercase">Revente</p><p className="font-bold text-emerald-600">€{opp.estimated_resale.toFixed(0)}</p></div>
             <div><p className="text-[10px] text-slate-400 font-medium uppercase">Profit</p><p className="font-bold text-emerald-600">+€{opp.potential_profit.toFixed(0)}</p></div>
           </div>

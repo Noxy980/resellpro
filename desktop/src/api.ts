@@ -81,6 +81,7 @@ export interface Opportunity {
   score: number; demand_level: string; selling_speed: string
   quick_sale_probability: number; why_buy: string; risk: string
   url: string; image_url: string | null; status: string; found_at: string
+  comparable_median?: number; comparable_count?: number
 }
 
 export interface InventoryItem {

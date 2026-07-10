@@ -16,6 +16,7 @@ from .image_analyzer import ImageAnalyzer
 from .knowledge_base import KnowledgeBaseStore
 from .sales_potential import SalesPotentialAnalyzer
 from .scorer import ExpertScore, ExpertScorer
+from .market_pricing import VintedMarketPricer
 from .gem_hunter import is_pepite_listing, is_year_round_item, pepite_category, pepite_demand_boost
 from .seasonal import get_current_season, season_match_score
 from .search_optimizer import SearchOptimizer
@@ -112,6 +113,7 @@ class ListingAnalyzer:
         self.sales_analyzer = SalesPotentialAnalyzer(config, self.knowledge)
         self.scorer = ExpertScorer(config)
         self.search_optimizer = SearchOptimizer(config)
+        self.market_pricer = VintedMarketPricer(client)
         self._season = get_current_season()
 
         self._brand_lookup = {b.name.lower(): b for b in config.target_brands}
@@ -181,49 +183,44 @@ class ListingAnalyzer:
         hot = self.demand_analyzer.match_hot_model(title, brand)
         model = _extract_model(title, brand, hot.canonical if hot else prescreen.matched_model)
 
-        comparables = self._fetch_comparables(brand, model, listing_id)
-        market = self.demand_analyzer.build_comparable_market(comparables, brand)
-
-        if market.count < self.config.criteria.min_comparable_samples:
-            if hot and hot.avg_resale_price > 0:
-                market.median_price = hot.avg_resale_price
-                market.count = max(market.count, self.config.criteria.min_comparable_samples)
-            elif is_pepite:
-                kb_resale = self.knowledge.expected_resale(brand, model)
-                est = kb_resale or (price * 1.55 if price > 0 else 0)
-                if est > price:
-                    market.median_price = est
-                    market.count = max(market.count, self.config.criteria.min_comparable_samples)
-                else:
-                    return None
-            else:
-                kb_resale = self.knowledge.expected_resale(brand, model)
-                if kb_resale:
-                    market.median_price = kb_resale
-                    market.count = self.config.criteria.min_comparable_samples
-                else:
-                    return None
+        # ── Prix réels Vinted : combien vendent les autres ce produit ? ──
+        mpa = self.market_pricer.analyze(
+            purchase_price=price,
+            brand=brand,
+            model=model,
+            title=title,
+            exclude_id=listing_id,
+            min_comparables=max(3, self.config.criteria.min_comparable_samples),
+        )
 
         condition = item.get("status") or "Unknown"
         condition_mult = self._condition_multiplier(condition)
-        estimated_resale = market.median_price * condition_mult
-        estimated_resale *= (1 - self.config.resale.conservative_discount_percent / 100)
 
-        if hot and hot.avg_resale_price > estimated_resale:
-            estimated_resale = hot.avg_resale_price * condition_mult * 0.95
+        ok, estimated_resale, profit, reject_reason = self.market_pricer.passes_margin_gate(
+            mpa,
+            price,
+            min_discount_percent=8.0,
+            min_profit_eur=self.config.criteria.min_expected_profit,
+            min_profit_after_fees_percent=self.config.criteria.min_profit_percent,
+            selling_cost_percent=self.config.resale.selling_cost_percent,
+            fixed_cost=self.config.resale.fixed_cost_per_item,
+            condition_mult=condition_mult,
+            conservative_discount=self.config.resale.conservative_discount_percent,
+        )
 
-        selling_costs = estimated_resale * (self.config.resale.selling_cost_percent / 100)
-        profit = estimated_resale - selling_costs - self.config.resale.fixed_cost_per_item - price
+        if not ok:
+            logger.debug("Rejected (marché Vinted): %s — %s", title[:50], reject_reason)
+            return None
+
         profit_pct = (profit / price * 100) if price > 0 else 0
+        is_underpriced = mpa.is_underpriced or prescreen.is_underpriced_hint
 
-        if profit < self.config.criteria.min_expected_profit:
-            if not (is_pepite and profit >= 5):
-                return None
-        if profit_pct < self.config.criteria.min_profit_percent:
-            if not (is_pepite and profit_pct >= 12):
-                return None
-
-        is_underpriced = price < market.median_price * 0.65 or prescreen.is_underpriced_hint
+        # Demand analysis avec données marché réelles
+        comparables = self._fetch_comparables(brand, model, listing_id)
+        market = self.demand_analyzer.build_comparable_market(comparables, brand)
+        if mpa.has_real_data:
+            market.median_price = mpa.median_price
+            market.count = max(market.count, mpa.count)
 
         photos = item.get("photos") or []
         photo_count = len(photos) or (1 if item.get("photo") else 0)
@@ -304,6 +301,12 @@ class ListingAnalyzer:
                 return None
             logger.info("Gem pass: %s (score %d, pepite=%s)", title, expert.total, is_pepite)
 
+        market_context = (
+            f"Marché Vinted: {mpa.count} similaires à €{mpa.median_price:.0f} médiane "
+            f"(achat €{price:.0f}, -{mpa.discount_vs_market:.0f}% vs marché, profit net €{profit:.0f})"
+        )
+        why_buy = f"{market_context}; {expert.why_buy}"
+
         self.knowledge_store.kb.learn(
             brand, model, price, estimated_resale, profit, sales.estimated_days_to_sell,
         )
@@ -313,7 +316,7 @@ class ListingAnalyzer:
             title=title,
             brand=brand,
             model=model,
-            category=_guess_category(title),
+            category=category,
             size=item.get("size_title") or "N/A",
             condition=condition,
             price=price,
@@ -324,14 +327,14 @@ class ListingAnalyzer:
             potential_profit=round(profit, 2),
             profit_percent=round(profit_pct, 1),
             opportunity_score=expert.total,
-            comparable_count=market.count,
-            comparable_median=round(market.median_price, 2),
+            comparable_count=mpa.count,
+            comparable_median=mpa.median_price,
             demand_level=demand.level,
             selling_speed=sales.speed_label,
             quick_sale_probability=sales.quick_sale_probability,
             estimated_days_to_sell=sales.estimated_days_to_sell,
             ease_of_resale=sales.ease_of_resale,
-            why_buy=expert.why_buy,
+            why_buy=why_buy,
             risk=expert.risk,
             score_breakdown={
                 "brand": expert.brand,

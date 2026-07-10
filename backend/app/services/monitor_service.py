@@ -110,12 +110,11 @@ class MonitorService:
         found: list[ListingAnalysis] = []
         stats["queries_run"] += 1
         per_page = self.config.listings_per_search
-        is_maillot_q = any(k in query.lower() for k in ("maillot", "jersey", "football", "psg", "om ", "france"))
 
         try:
             items = self.client.search_catalog(
                 query,
-                order="relevance" if is_maillot_q else "newest_first",
+                order="newest_first",
                 per_page=per_page,
             )
         except Exception as exc:
@@ -298,6 +297,8 @@ class MonitorService:
             "score_breakdown": a.score_breakdown,
             "ease_of_resale": a.ease_of_resale,
             "is_underpriced": a.is_underpriced,
+            "comparable_median": a.comparable_median,
+            "comparable_count": a.comparable_count,
             "found_at": datetime.now(timezone.utc).isoformat(),
         }
 

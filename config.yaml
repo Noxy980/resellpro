@@ -150,10 +150,10 @@ hot_models:
 # ---------------------------------------------------------------------------
 criteria:
   max_purchase_price: 150.0
-  min_expected_profit: 7.0
-  min_profit_percent: 15.0
+  min_expected_profit: 8.0
+  min_profit_percent: 18.0
   min_opportunity_score: 58
-  min_comparable_samples: 2
+  min_comparable_samples: 3
   min_quick_sale_probability: 28.0
   max_days_to_sell: 50
   max_alerts_per_cycle: 40
