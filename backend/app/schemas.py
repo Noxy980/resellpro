@@ -112,8 +112,11 @@ class ListingGenerateRequest(BaseModel):
     condition: str
     size: str
     category: str
+    color: str = ""
+    defects: str = ""
     extra_info: str = ""
     target_price: float = 0
+    purchase_price: float = 0
 
 
 class ListingOptimizeRequest(BaseModel):

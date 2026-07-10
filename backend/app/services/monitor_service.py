@@ -13,6 +13,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
+from src.brand_intelligence import get_fast_mover_brands, get_seasonal_search_terms
+from src.seasonal import get_current_season
 from src.analyzer import ListingAnalysis, ListingAnalyzer  # noqa: E402
 from src.config import load_config, resolve_path  # noqa: E402
 from src.knowledge_base import KnowledgeBaseStore  # noqa: E402
@@ -79,11 +81,21 @@ class MonitorService:
         }
 
     def _build_queries(self) -> list[str]:
-        queries = [b.name for b in self.config.target_brands]
+        season = get_current_season()
+        queries: list[str] = []
+
+        for brand in get_fast_mover_brands(season)[:10]:
+            queries.append(brand)
+
+        queries.extend(get_seasonal_search_terms(season)[:14])
+
+        for b in self.config.target_brands:
+            queries.append(b.name)
+
         if self.config.enable_typo_searches:
-            queries.extend(self.optimizer.typo_search_queries()[:6])
-        queries.extend(self.optimizer.seasonal_search_queries()[:8])
-        return list(dict.fromkeys(queries))[:16]
+            queries.extend(self.optimizer.typo_search_queries()[:8])
+        queries.extend(self.optimizer.seasonal_search_queries()[:10])
+        return list(dict.fromkeys(queries))[:24]
 
     def _run_query(self, query: str, stats: dict) -> list[ListingAnalysis]:
         """Run one catalog search and return analyses that pass the scorer."""
@@ -108,14 +120,14 @@ class MonitorService:
         analyzed_this_query = 0
 
         for item in items:
-            if analyzed_this_query >= 8:
+            if analyzed_this_query >= 12:
                 break
             if not self.analyzer.quick_screen(item):
                 continue
 
             analyzed_this_query += 1
             try:
-                analysis = self.analyzer.analyze(item, relaxed=True)
+                analysis = self.analyzer.analyze(item, relaxed=False)
             except Exception as exc:
                 logger.error("Analysis error: %s", exc)
                 stats["errors"] += 1
@@ -272,7 +284,7 @@ class MonitorService:
             items = self.client.search_catalog(str(vinted_id), per_page=5)
             for item in items:
                 if int(item.get("id", 0)) == vinted_id:
-                    analysis = self.analyzer.analyze(item, relaxed=True)
+                    analysis = self.analyzer.analyze(item, relaxed=False)
                     return self._to_dict(analysis) if analysis else None
         except Exception as exc:
             logger.error("Manual analyze error: %s", exc)

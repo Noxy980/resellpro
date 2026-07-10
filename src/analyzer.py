@@ -270,10 +270,12 @@ class ListingAnalyzer:
             image=image, comparable_count=market.count,
             has_red_flags=red_flags, is_underpriced=is_underpriced,
             is_typo=prescreen.is_typo_listing,
+            season_score=season_score,
+            season_name=self._season.name,
         )
 
         if not expert.reseller_approved:
-            if not relaxed or expert.total < 55 or profit < 8:
+            if not relaxed or expert.total < 65 or profit < 12:
                 logger.debug(
                     "Rejected by reseller gate: %s (score %d, days %d, demand %s)",
                     title, expert.total, sales.estimated_days_to_sell, demand.level,
@@ -317,6 +319,7 @@ class ListingAnalyzer:
                 "resale_speed": expert.resale_speed,
                 "style": expert.style,
                 "listing_quality": expert.listing_quality,
+                "season": expert.season,
             },
             is_typo_listing=prescreen.is_typo_listing,
             is_underpriced=is_underpriced,

@@ -1,15 +1,23 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Bot, User, Sparkles, TrendingUp, Trash2 } from 'lucide-react'
 import { api, ChatMessage } from '../api'
-import PageShell from '../components/PageShell'
+import MarkdownContent from '../components/MarkdownContent'
 
-const WELCOME = "Bonjour ! Je suis votre assistant expert en revente Vinted. Posez-moi vos questions sur les achats, les prix, les tendances ou la stratégie de vente."
+const WELCOME = `Bonjour ! Je suis **ResellPro AI**, votre expert en achat-revente Vinted.
+
+Je peux vous aider à :
+- **Trouver** les meilleures opportunités du moment
+- **Fixer** le bon prix de revente
+- **Analyser** une marque ou un modèle
+- **Optimiser** votre stratégie de vente
+
+Posez-moi une question ou choisissez une suggestion ci-dessous.`
 
 const SUGGESTIONS = [
   'Quels vêtements acheter en ce moment ?',
-  'Quelles marques se revendent le mieux ?',
+  'Top marques qui se revendent vite',
   'Comment fixer le bon prix ?',
-  'Conseils pour vendre plus vite',
+  'Stratégie pour vendre en 7 jours',
 ]
 
 export default function AIAssistant() {
@@ -18,15 +26,13 @@ export default function AIAssistant() {
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     api.chatHistory()
       .then(msgs => {
-        if (msgs.length > 0) {
-          setMessages(msgs)
-        } else {
-          setMessages([{ id: 0, role: 'assistant', content: WELCOME, created_at: new Date().toISOString() }])
-        }
+        if (msgs.length > 0) setMessages(msgs)
+        else setMessages([{ id: 0, role: 'assistant', content: WELCOME, created_at: new Date().toISOString() }])
       })
       .catch(() => {
         setMessages([{ id: 0, role: 'assistant', content: WELCOME, created_at: new Date().toISOString() }])
@@ -34,7 +40,7 @@ export default function AIAssistant() {
       .finally(() => setLoaded(true))
   }, [])
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return
@@ -50,7 +56,7 @@ export default function AIAssistant() {
     } catch {
       setMessages(m => [...m, {
         id: Date.now() + 1, role: 'assistant',
-        content: 'Erreur de connexion à l\'IA. Vérifiez que l\'API Render est en ligne.',
+        content: '**Erreur de connexion** — Vérifiez que l\'API Render est en ligne.',
         created_at: new Date().toISOString(),
       }])
     } finally { setLoading(false) }
@@ -66,31 +72,32 @@ export default function AIAssistant() {
     try {
       const res = await api.trends()
       setMessages(m => [...m,
-        { id: Date.now(), role: 'user', content: 'Quelles sont les tendances actuelles ?', created_at: new Date().toISOString() },
+        { id: Date.now(), role: 'user', content: 'Quelles sont les tendances actuelles du resell ?', created_at: new Date().toISOString() },
         { id: Date.now() + 1, role: 'assistant', content: res.analysis, created_at: new Date().toISOString() },
       ])
     } finally { setLoading(false) }
   }
 
   if (!loaded) {
-    return <PageShell><div className="skeleton h-96 rounded-3xl" /></PageShell>
+    return <div className="p-8 max-w-4xl mx-auto"><div className="skeleton h-96 rounded-3xl" /></div>
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] lg:h-[calc(100vh-2rem)]">
-      <PageShell className="!pb-4 flex-shrink-0">
-        <div className="flex items-center justify-between gap-3">
+    <div className="flex flex-col h-full min-h-0">
+      {/* Header */}
+      <div className="shrink-0 px-4 md:px-8 pt-6 pb-4 border-b border-slate-100/80 bg-white/50 backdrop-blur-xl">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-gradient-to-br from-violet-500 to-violet-700 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/30">
+            <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/25">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="page-title text-xl">Assistant IA</h1>
-              <p className="text-xs text-violet-600 font-medium">Historique sauvegardé · OpenRouter</p>
+              <h1 className="text-xl font-bold text-slate-900 font-display">Assistant IA</h1>
+              <p className="text-xs text-violet-600 font-medium">Expert resell · Markdown · Historique sauvegardé</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={trends} className="btn-secondary text-xs py-2">
+            <button onClick={trends} disabled={loading} className="btn-secondary text-xs py-2">
               <TrendingUp className="w-3.5 h-3.5" />Tendances
             </button>
             <button onClick={clear} className="btn-ghost text-xs py-2 text-red-500">
@@ -98,52 +105,78 @@ export default function AIAssistant() {
             </button>
           </div>
         </div>
-      </PageShell>
-
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 space-y-4 max-w-3xl mx-auto w-full">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-              msg.role === 'assistant' ? 'bg-violet-100' : 'bg-slate-200'
-            }`}>
-              {msg.role === 'assistant'
-                ? <Bot className="w-4 h-4 text-violet-600" />
-                : <User className="w-4 h-4 text-slate-600" />}
-            </div>
-            <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-              msg.role === 'assistant'
-                ? 'bg-white border border-slate-100 shadow-soft text-slate-800'
-                : 'bg-slate-900 text-white'
-            }`}>{msg.content}</div>
-          </div>
-        ))}
-        {loading && (
-          <div className="flex gap-3">
-            <div className="w-8 h-8 bg-violet-100 rounded-xl flex items-center justify-center">
-              <Bot className="w-4 h-4 text-violet-600 animate-pulse" />
-            </div>
-            <div className="bg-white border border-slate-100 rounded-2xl px-4 py-3 text-sm text-slate-400 shadow-soft">
-              Réflexion en cours...
-            </div>
-          </div>
-        )}
-        <div ref={bottomRef} />
       </div>
 
-      {messages.length <= 2 && (
-        <div className="px-4 md:px-8 pb-2 flex flex-wrap gap-2 max-w-3xl mx-auto w-full">
-          {SUGGESTIONS.map(s => (
-            <button key={s} onClick={() => send(s)} className="btn-secondary text-xs">{s}</button>
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto min-h-0 px-4 md:px-8 py-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                msg.role === 'assistant'
+                  ? 'bg-gradient-to-br from-violet-100 to-indigo-100'
+                  : 'bg-slate-800'
+              }`}>
+                {msg.role === 'assistant'
+                  ? <Bot className="w-4 h-4 text-violet-600" />
+                  : <User className="w-4 h-4 text-white" />}
+              </div>
+              <div className={`max-w-[88%] md:max-w-[78%] rounded-2xl px-4 py-3 text-sm ${
+                msg.role === 'assistant'
+                  ? 'bg-white border border-slate-100 shadow-soft text-slate-800'
+                  : 'bg-slate-900 text-white'
+              }`}>
+                {msg.role === 'assistant'
+                  ? <MarkdownContent content={msg.content} />
+                  : <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
+              </div>
+            </div>
           ))}
+
+          {loading && (
+            <div className="flex gap-3">
+              <div className="w-9 h-9 bg-violet-100 rounded-xl flex items-center justify-center">
+                <Bot className="w-4 h-4 text-violet-600" />
+              </div>
+              <div className="bg-white border border-slate-100 rounded-2xl px-4 py-3 shadow-soft">
+                <div className="flex gap-1.5">
+                  <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+      </div>
+
+      {/* Suggestions */}
+      {messages.length <= 2 && !loading && (
+        <div className="shrink-0 px-4 md:px-8 pb-2">
+          <div className="max-w-4xl mx-auto flex flex-wrap gap-2">
+            {SUGGESTIONS.map(s => (
+              <button key={s} onClick={() => send(s)} className="btn-secondary text-xs">{s}</button>
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="px-4 md:px-8 py-4 border-t border-slate-100 bg-white/80 backdrop-blur-xl pb-24 lg:pb-4">
-        <div className="flex gap-2 max-w-3xl mx-auto">
-          <input className="input flex-1" placeholder="Posez votre question..."
-            value={input} onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && send(input)} />
-          <button onClick={() => send(input)} disabled={loading} className="btn-primary px-5">
+      {/* Input */}
+      <div className="shrink-0 px-4 md:px-8 py-4 border-t border-slate-100 bg-white/90 backdrop-blur-xl pb-24 lg:pb-5">
+        <div className="max-w-4xl mx-auto flex gap-2 items-end">
+          <textarea
+            ref={textareaRef}
+            className="input flex-1 min-h-[44px] max-h-32 resize-none py-3"
+            placeholder="Posez votre question sur le resell, les prix, les marques..."
+            rows={1}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input) }
+            }}
+          />
+          <button onClick={() => send(input)} disabled={loading || !input.trim()} className="btn-primary px-5 h-11 shrink-0">
             <Send className="w-4 h-4" />
           </button>
         </div>

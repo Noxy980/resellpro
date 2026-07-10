@@ -27,8 +27,10 @@
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.28.0",
-    "recharts": "^2.13.3"
+    "recharts": "^2.13.3",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.2.0",
@@ -62,12 +64,19 @@
       {
         "from": "../backend",
         "to": "backend",
-        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
       },
       {
         "from": "../src",
         "to": "src",
-        "filter": ["**/*", "!**/__pycache__/**"]
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**"
+        ]
       },
       {
         "from": "../config.yaml",
@@ -82,7 +91,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.png"

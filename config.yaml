@@ -116,7 +116,7 @@ criteria:
   max_purchase_price: 80.0
   min_expected_profit: 12.0
   min_profit_percent: 25.0
-  min_opportunity_score: 68
+  min_opportunity_score: 72
   min_comparable_samples: 4
   min_quick_sale_probability: 45.0
   max_days_to_sell: 50

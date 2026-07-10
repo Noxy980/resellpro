@@ -15,7 +15,7 @@ const NAV_MORE = [
   { to: '/vinted', icon: User, label: 'Mon Vinted' },
   { to: '/vinted/connect', icon: LogIn, label: 'Connexion' },
   { to: '/listings', icon: FileText, label: 'Annonces' },
-  { to: '/photos', icon: Camera, label: 'Photo Studio' },
+  { to: '/photos', icon: Camera, label: 'AI Photo Studio' },
   { to: '/stats', icon: BarChart3, label: 'Statistiques' },
   { to: '/settings', icon: Settings, label: 'Paramètres' },
 ]
@@ -26,7 +26,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const isActive = (to: string) => to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
 
   return (
-    <aside className="w-64 shrink-0 flex flex-col h-full bg-white/70 backdrop-blur-2xl border-r border-slate-200/60">
+    <aside className="w-full h-full flex flex-col bg-white/80 backdrop-blur-2xl border-r border-slate-200/60">
       <div className="p-6">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-600 to-violet-800 flex items-center justify-center shadow-lg shadow-violet-500/30">

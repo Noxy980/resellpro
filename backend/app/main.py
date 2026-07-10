@@ -445,6 +445,7 @@ def generate_listing(req: ListingGenerateRequest, db: Session = Depends(get_db))
     return ai.generate_listing(
         brand=req.brand, condition=req.condition, size=req.size,
         category=req.category, extra_info=req.extra_info, target_price=req.target_price,
+        color=req.color, defects=req.defects, purchase_price=req.purchase_price,
     )
 
 
@@ -529,6 +530,7 @@ def create_draft(data: ListingGenerateRequest, db: Session = Depends(get_db)):
     generated = ai.generate_listing(
         brand=data.brand, condition=data.condition, size=data.size,
         category=data.category, extra_info=data.extra_info, target_price=data.target_price,
+        color=data.color, defects=data.defects, purchase_price=data.purchase_price,
     )
     draft = DraftListing(
         title=generated.get("title", ""),
@@ -537,7 +539,7 @@ def create_draft(data: ListingGenerateRequest, db: Session = Depends(get_db)):
         condition=data.condition,
         price=float(generated.get("recommended_price", data.target_price) or 0),
         keywords=generated.get("keywords", ""),
-        ai_tips=generated.get("selling_tips", ""),
+        ai_tips=f"{generated.get('selling_tips', '')}\n\n{generated.get('photo_tips', '')}".strip(),
         status="ready",
     )
     db.add(draft)

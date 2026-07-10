@@ -31,13 +31,15 @@ export default function App() {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Desktop sidebar */}
-        <div className="hidden lg:flex shrink-0">
-          <Sidebar />
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Sidebar fixe — seul le contenu principal défile */}
+        <div className="hidden lg:block w-64 shrink-0">
+          <div className="sticky top-0 h-screen overflow-y-auto border-r border-slate-200/60">
+            <Sidebar />
+          </div>
         </div>
 
-        <main className="flex-1 overflow-auto relative">
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/opportunities" element={<Opportunities />} />

@@ -130,6 +130,12 @@
     @apply px-4 py-6 pb-28 md:px-8 md:py-8 md:pb-8 max-w-7xl mx-auto w-full;
   }
 
+  .markdown-body {
+    @apply text-sm leading-relaxed;
+  }
+  .markdown-body > *:first-child { @apply mt-0; }
+  .markdown-body > *:last-child { @apply mb-0; }
+
   .skeleton {
     @apply rounded-2xl bg-gradient-to-r from-slate-100 via-slate-200/80 to-slate-100 bg-[length:200%_100%] animate-shimmer;
   }

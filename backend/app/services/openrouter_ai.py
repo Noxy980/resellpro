@@ -21,8 +21,17 @@ MODEL_VISION = "google/gemma-4-31b-it:free"
 
 SYSTEM_PROMPT = """Tu es ResellPro AI, assistant expert en achat-revente de vêtements sur Vinted.
 Tu aides à trouver des opportunités rentables, analyser des articles, fixer les prix et vendre plus vite.
-Sois direct, pratique et honnête. Signale les risques (contrefaçons, articles lents, mauvais état).
-Réponds dans la langue de l'utilisateur. Réponses concises et actionnables."""
+
+RÈGLES DE FORMATAGE (obligatoire):
+- Utilise le Markdown pour structurer tes réponses
+- **Gras** pour les points clés et chiffres importants
+- ## Titres pour les sections
+- Listes à puces pour les recommandations
+- Tableaux si tu compares des options
+- Sois direct, pratique et honnête
+- Signale les risques (contrefaçons, articles lents, mauvais état)
+- Réponds dans la langue de l'utilisateur (français par défaut)
+- Réponses actionnables avec des chiffres concrets (€, %, jours)"""
 
 
 class OpenRouterAI:
@@ -116,28 +125,62 @@ class OpenRouterAI:
     def generate_listing(
         self, *, brand: str, condition: str, size: str,
         category: str, extra_info: str = "", target_price: float = 0,
+        color: str = "", defects: str = "", purchase_price: float = 0,
     ) -> dict[str, str]:
-        prompt = (
-            f"Génère une annonce Vinted optimisée en français.\n"
-            f"Marque: {brand}\nÉtat: {condition}\nTaille: {size}\n"
-            f"Catégorie: {category}\nDétails: {extra_info}\nPrix cible: €{target_price}\n\n"
-            'Réponds en JSON: {"title","description","keywords","recommended_price","selling_tips","category"}'
-        )
+        from datetime import date
+        month = date.today().month
+        season = "été" if month in (6, 7, 8) else "hiver" if month in (12, 1, 2) else "mi-saison"
+
+        prompt = f"""Génère une annonce Vinted professionnelle en français pour un revendeur expert.
+
+ARTICLE:
+- Marque: {brand}
+- Catégorie: {category}
+- Taille: {size}
+- Couleur: {color or 'non précisée'}
+- État: {condition}
+- Défauts: {defects or 'aucun'}
+- Prix d'achat: €{purchase_price or 'N/A'}
+- Prix cible revente: €{target_price or 'à estimer'}
+- Saison actuelle: {season}
+- Détails: {extra_info}
+
+Réponds UNIQUEMENT en JSON valide:
+{{
+  "title": "titre optimisé Vinted max 80 caractères avec mots-clés recherche",
+  "description": "description professionnelle 150-300 mots avec emojis discrets, détails, mesures si pertinent, rassurante",
+  "keywords": "mots-clés séparés par virgules",
+  "recommended_price": "prix idéal en nombre",
+  "min_price": "prix minimum acceptable",
+  "estimated_margin": "marge estimée en €",
+  "selling_tips": "conseils: timing publication, photos, négociation",
+  "photo_tips": "conseils photo spécifiques à cet article",
+  "category": "{category}"
+}}"""
         result = self._request([
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
-        ], model=MODEL_STRUCTURED, json_mode=True, max_tokens=700)
+        ], model=MODEL_STRUCTURED, json_mode=True, max_tokens=1200)
 
         parsed = self._parse_json(result)
         if parsed:
             return parsed
 
         return {
-            "title": f"{brand} {category} — Taille {size} — {condition}",
-            "description": f"✨ {brand} en {condition}\n📏 Taille {size}\n📦 Envoi rapide\n{extra_info}",
-            "keywords": f"{brand}, {category}, {size}, vinted",
+            "title": f"{brand} {category} {color} — Taille {size} — {condition}".strip(),
+            "description": (
+                f"✨ {brand} en excellent état\n"
+                f"📏 Taille {size}\n"
+                f"🎨 Couleur: {color or 'voir photos'}\n"
+                f"📦 Envoi rapide et soigné\n"
+                f"{defects and '⚠️ ' + defects or ''}\n{extra_info}"
+            ).strip(),
+            "keywords": f"{brand}, {category}, {size}, {color}, vinted, mode",
             "recommended_price": str(target_price or ""),
-            "selling_tips": "4+ photos, publier le soir, répondre vite.",
+            "min_price": str(max(0, (target_price or 0) * 0.85)),
+            "estimated_margin": str(max(0, (target_price or 0) - (purchase_price or 0))),
+            "selling_tips": "Publier entre 19h-22h, 4+ photos, répondre en moins de 2h.",
+            "photo_tips": "Lumière naturelle, fond neutre, montrer étiquette et défauts.",
             "category": category,
         }
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .aesthetic import AestheticAssessment
+from .brand_intelligence import brand_rejection_penalty, effective_brand_scores
 from .config import AppConfig, BrandConfig
 from .demand import DemandAssessment
 from .image_analyzer import ImageAssessment
@@ -20,13 +20,14 @@ class ExpertScore:
     resale_speed: float
     style: float
     listing_quality: float
+    season: float
     why_buy: str
     risk: str
     reseller_approved: bool
 
 
 class ExpertScorer:
-    """Brand 15 | Demand 25 | Profit 20 | Speed 15 | Style 15 | Listing 10"""
+    """Brand 12 | Demand 22 | Profit 18 | Speed 14 | Style 12 | Listing 10 | Season 12"""
 
     def __init__(self, config: AppConfig) -> None:
         self.config = config
@@ -34,11 +35,17 @@ class ExpertScorer:
     def _clamp(self, v: float, lo: float = 0.0, hi: float = 100.0) -> float:
         return max(lo, min(hi, v))
 
-    def _brand_points(self, brand_cfg: BrandConfig) -> float:
-        return self._clamp(brand_cfg.popularity) * 0.15
+    def _brand_points(self, brand_cfg: BrandConfig, brand_name: str = "") -> float:
+        pop, _ = effective_brand_scores(
+            brand_name or brand_cfg.name,
+            config_popularity=brand_cfg.popularity,
+            config_resale_ease=brand_cfg.resale_ease,
+        )
+        penalty = brand_rejection_penalty(brand_name or brand_cfg.name)
+        return self._clamp(pop * penalty) * 0.12
 
     def _demand_points(self, demand: DemandAssessment) -> float:
-        return self._clamp(demand.score) * 0.25
+        return self._clamp(demand.score) * 0.22
 
     def _profit_points(self, profit: float, profit_percent: float, purchase: float, resale: float) -> float:
         if profit <= 0:
@@ -55,7 +62,7 @@ class ExpertScorer:
 
         absolute_bonus = min(20, profit / 2)
         raw = margin_score * 0.7 + absolute_bonus * 0.3
-        return self._clamp(raw) * 0.20
+        return self._clamp(raw) * 0.18
 
     def _speed_points(self, sales: SalesPotential) -> float:
         days = sales.estimated_days_to_sell
@@ -72,7 +79,7 @@ class ExpertScorer:
         else:
             raw = 10
         raw = raw * 0.6 + sales.quick_sale_probability * 0.4
-        return self._clamp(raw) * 0.15
+        return self._clamp(raw) * 0.14
 
     def _style_points(self, aesthetic: AestheticAssessment) -> float:
         score = aesthetic.score
@@ -82,7 +89,7 @@ class ExpertScorer:
             score *= 0.4
         if aesthetic.is_kids_item:
             score *= 0.5
-        return self._clamp(score) * 0.15
+        return self._clamp(score) * 0.12
 
     def _listing_points(self, image: ImageAssessment) -> float:
         score = image.score
@@ -93,6 +100,9 @@ class ExpertScorer:
         if image.has_defect_signals:
             score *= 0.5
         return self._clamp(score) * 0.10
+
+    def _season_points(self, season_score: float) -> float:
+        return self._clamp(season_score) * 0.12
 
     def _build_why_buy(
         self,
@@ -106,8 +116,11 @@ class ExpertScorer:
         is_underpriced: bool,
         is_typo: bool,
         aesthetic: AestheticAssessment,
+        season_name: str = "",
     ) -> str:
         reasons: list[str] = []
+        if season_name:
+            reasons.append(f"Adapté à la saison ({season_name})")
         if is_underpriced:
             reasons.append("Priced well below market median")
         if is_typo:
@@ -167,9 +180,12 @@ class ExpertScorer:
         image: ImageAssessment,
         demand: DemandAssessment,
         has_red_flags: bool,
+        season_score: float = 50.0,
     ) -> bool:
         c = self.config.criteria
         if total < c.min_opportunity_score:
+            return False
+        if season_score < 35:
             return False
         if profit < c.min_expected_profit:
             return False
@@ -209,20 +225,25 @@ class ExpertScorer:
         has_red_flags: bool,
         is_underpriced: bool,
         is_typo: bool,
+        season_score: float = 50.0,
+        season_name: str = "",
     ) -> ExpertScore:
-        brand_pts = self._brand_points(brand_cfg)
+        brand_pts = self._brand_points(brand_cfg, brand)
         demand_pts = self._demand_points(demand)
         profit_pts = self._profit_points(profit, profit_percent, purchase_price, estimated_resale)
         speed_pts = self._speed_points(sales)
         style_pts = self._style_points(aesthetic)
         listing_pts = self._listing_points(image)
+        season_pts = self._season_points(season_score)
 
-        total = int(round(brand_pts + demand_pts + profit_pts + speed_pts + style_pts + listing_pts))
+        total = int(round(
+            brand_pts + demand_pts + profit_pts + speed_pts + style_pts + listing_pts + season_pts
+        ))
 
         why = self._build_why_buy(
             brand=brand, model=model, profit=profit, profit_percent=profit_percent,
             demand=demand, sales=sales, is_underpriced=is_underpriced,
-            is_typo=is_typo, aesthetic=aesthetic,
+            is_typo=is_typo, aesthetic=aesthetic, season_name=season_name,
         )
         risk = self._build_risk(
             image=image, aesthetic=aesthetic, sales=sales,
@@ -232,16 +253,18 @@ class ExpertScorer:
         approved = self._reseller_gate(
             total=total, profit=profit, sales=sales, aesthetic=aesthetic,
             image=image, demand=demand, has_red_flags=has_red_flags,
+            season_score=season_score,
         )
 
         return ExpertScore(
             total=total,
-            brand=round(brand_pts / 0.15, 1),
-            demand=round(demand_pts / 0.25, 1),
-            profit=round(profit_pts / 0.20, 1),
-            resale_speed=round(speed_pts / 0.15, 1),
-            style=round(style_pts / 0.15, 1),
+            brand=round(brand_pts / 0.12, 1),
+            demand=round(demand_pts / 0.22, 1),
+            profit=round(profit_pts / 0.18, 1),
+            resale_speed=round(speed_pts / 0.14, 1),
+            style=round(style_pts / 0.12, 1),
             listing_quality=round(listing_pts / 0.10, 1),
+            season=round(season_pts / 0.12, 1),
             why_buy=why,
             risk=risk,
             reseller_approved=approved,

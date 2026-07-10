@@ -5,6 +5,7 @@ import {
   CheckCircle, AlertTriangle, MessageSquare,
 } from 'lucide-react'
 import { api, Opportunity } from '../api'
+import MarkdownContent from './MarkdownContent'
 
 interface Props {
   opportunity: Opportunity
@@ -98,7 +99,7 @@ export default function OpportunityDetail({ opportunity: opp, onClose, onAction 
               <div className="flex items-center gap-2 text-violet-700 text-sm font-medium mb-1">
                 <Sparkles className="w-4 h-4" />Recommandation IA
               </div>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{aiRec}</p>
+              <MarkdownContent content={aiRec} className="text-sm" />
             </div>
           )}
 

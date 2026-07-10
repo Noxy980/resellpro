@@ -24,14 +24,20 @@ def get_current_season(today: date | None = None) -> SeasonProfile:
         return SeasonProfile(
             name="été",
             keywords=[
-                "t-shirt", "tee", "short", "shorts", "polo", "chemise légère",
+                "t-shirt", "tee", "tshirt", "short", "shorts", "polo", "chemise",
                 "sandales", "lunettes", "soleil", "lin", "débardeur", "maillot",
-                "basket", "sneaker", "bermuda", "casquette", "cap",
+                "basket", "sneaker", "bermuda", "casquette", "cap", "short sleeve",
+                "cargo short", "tank top", "slides", "bucket hat", "sunglasses",
+                "swim", "boardshort", "veste légère", "windbreaker",
             ],
-            categories=["t-shirt", "short", "polo", "chemise", "sneaker", "accessoire"],
-            brands_boost=["Nike", "Adidas", "Carhartt", "Patagonia", "The North Face"],
-            avoid_keywords=["doudoune", "parka", "manteau", "pull laine", "boots hiver"],
-            demand_multiplier=1.15,
+            categories=["t-shirt", "short", "polo", "chemise", "sneaker", "accessoire", "maillot"],
+            brands_boost=["Nike", "Adidas", "Carhartt", "Lacoste", "Ralph Lauren", "New Balance", "Salomon"],
+            avoid_keywords=[
+                "doudoune", "parka", "manteau laine", "pull laine", "boots hiver",
+                "bonnet", "écharpe", "gants", "puffer", "down jacket", "nuptse",
+                "fleece heavy", "winter", "hiver", "ski",
+            ],
+            demand_multiplier=1.20,
         )
     if month in (12, 1, 2):
         return SeasonProfile(
@@ -39,46 +45,56 @@ def get_current_season(today: date | None = None) -> SeasonProfile:
             keywords=[
                 "doudoune", "parka", "manteau", "coat", "veste", "jacket",
                 "pull", "sweat", "hoodie", "boot", "chelsea", "nuptse",
-                "fleece", "softshell", "gore-tex", "technique",
+                "fleece", "softshell", "gore-tex", "technique", "puffer",
+                "down", "wool", "laine", "bonnet", "beanie", "écharpe",
             ],
-            categories=["veste", "manteau", "pull", "sweat", "boot"],
-            brands_boost=["The North Face", "Stone Island", "Arc'teryx", "Patagonia", "Carhartt"],
-            avoid_keywords=["short", "bermuda", "maillot de bain"],
-            demand_multiplier=1.20,
+            categories=["veste", "manteau", "pull", "sweat", "boot", "doudoune"],
+            brands_boost=["The North Face", "Stone Island", "Arc'teryx", "Patagonia", "Carhartt", "Moncler", "Canada Goose"],
+            avoid_keywords=["short", "bermuda", "maillot de bain", "t-shirt", "polo", "sandales", "débardeur"],
+            demand_multiplier=1.25,
         )
     if month in (3, 4, 5):
         return SeasonProfile(
             name="printemps",
             keywords=[
                 "veste", "jacket", "blouson", "sweat", "hoodie", "polo",
-                "pantalon", "jean", "sneaker", "basket", "chemise",
+                "pantalon", "jean", "sneaker", "basket", "chemise", "cargo",
+                "windbreaker", "zip", "cardigan", "bomber",
             ],
-            categories=["veste", "sweat", "pantalon", "sneaker", "polo"],
-            brands_boost=["Nike", "Carhartt", "Ralph Lauren", "Lacoste", "Stone Island"],
-            avoid_keywords=["doudoune", "short"],
-            demand_multiplier=1.05,
+            categories=["veste", "sweat", "pantalon", "sneaker", "polo", "jean"],
+            brands_boost=["Nike", "Carhartt", "Ralph Lauren", "Lacoste", "Stone Island", "New Balance"],
+            avoid_keywords=["doudoune", "nuptse", "puffer", "maillot"],
+            demand_multiplier=1.08,
         )
-    # autumn
     return SeasonProfile(
         name="automne",
         keywords=[
             "veste", "jacket", "manteau", "pull", "sweat", "hoodie",
             "pantalon", "cargo", "boot", "chelsea", "fleece", "parka",
+            "gilet", "overshirt", "flannel", "trench",
         ],
-        categories=["veste", "pull", "sweat", "pantalon", "boot"],
-        brands_boost=["Carhartt", "The North Face", "Stone Island", "Nike", "Patagonia"],
-        avoid_keywords=["short", "maillot"],
-        demand_multiplier=1.10,
+        categories=["veste", "pull", "sweat", "pantalon", "boot", "manteau"],
+        brands_boost=["Carhartt", "The North Face", "Stone Island", "Nike", "Patagonia", "Barbour"],
+        avoid_keywords=["short", "maillot", "sandales", "débardeur"],
+        demand_multiplier=1.12,
     )
 
 
 def season_match_score(title: str, category: str, season: SeasonProfile) -> float:
     text = f"{title} {category}".lower()
-    score = 50.0
+    score = 45.0
+    hits = 0
     for kw in season.keywords:
         if kw in text:
-            score += 8
+            score += 7
+            hits += 1
     for avoid in season.avoid_keywords:
         if avoid in text:
-            score -= 15
+            score -= 22
+    if hits >= 2:
+        score += 10
     return max(0, min(100, score))
+
+
+def is_off_season(title: str, category: str, season: SeasonProfile) -> bool:
+    return season_match_score(title, category, season) < 30
